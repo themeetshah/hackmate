@@ -1,0 +1,56 @@
+[
+    {
+        "model": "users.userprofile",
+        "pk": 1,
+        "fields": {
+            "user": 1,
+            "bio": "Administrator account for managing HackMate backend.",
+            "profile_picture": null,
+            "address": "123 Admin Street",
+            "phone_number": "+0000000000",
+            "timezone": "UTC",
+            "linkedin_url": "https://www.linkedin.com/in/admin",
+            "github_url": "https://github.com/admin",
+            "leetcode_url": "",
+            "portfolio_url": "",
+            "skills": [1, 2], 
+            "experience_level": "expert",
+            "years_of_experience": 10,
+            "interests": "Full-stack, DevOps",
+            "preferred_team_size": 4,
+            "availability_status": true,
+            "average_rating": "5.00",
+            "total_hackathons": 20,
+            "hackathons_won": 10,
+            "created_at": "2025-01-01T00:00:00Z",
+            "updated_at": "2025-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "users.userprofile",
+        "pk": 2,
+        "fields": {
+            "user": 2,
+            "bio": "Frontend specialist with React and TailwindCSS.",
+            "profile_picture": null,
+            "address": "456 Frontend Ave",
+            "phone_number": "+1111111111",
+            "timezone": "UTC",
+            "linkedin_url": "https://www.linkedin.com/in/alice",
+            "github_url": "https://github.com/alice",
+            "leetcode_url": "",
+            "portfolio_url": "",
+            "skills": [1, 3], 
+            "experience_level": "intermediate",
+            "years_of_experience": 3,
+            "interests": "Frontend, UI/UX",
+            "preferred_team_size": 4,
+            "availability_status": true,
+            "average_rating": "4.50",
+            "total_hackathons": 5,
+            "hackathons_won": 2,
+            "created_at": "2025-01-02T00:00:00Z",
+            "updated_at": "2025-01-02T00:00:00Z"
+        }
+    }
+]

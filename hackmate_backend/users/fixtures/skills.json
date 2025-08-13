@@ -1,0 +1,38 @@
+[
+    {
+        "model": "users.skill",
+        "pk": 1,
+        "fields": {
+            "name": "React",
+            "category": "frontend",
+            "created_at": "2025-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "users.skill",
+        "pk": 2,
+        "fields": {
+            "name": "Django",
+            "category": "backend",
+            "created_at": "2025-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "users.skill",
+        "pk": 3,
+        "fields": {
+            "name": "Figma",
+            "category": "design",
+            "created_at": "2025-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "users.skill",
+        "pk": 4,
+        "fields": {
+            "name": "TensorFlow",
+            "category": "ml_ai",
+            "created_at": "2025-01-01T00:00:00Z"
+        }
+    }
+]
