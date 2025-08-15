@@ -1,0 +1,769 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import {
+  Search, Plus, Calendar, MapPin, Trophy, Users, Clock,
+  DollarSign, Globe, Monitor, X, ChevronDown, SlidersHorizontal,
+  Code, Database, Palette, Briefcase, Shield, Heart, BookOpen,
+  RefreshCw
+} from 'lucide-react';
+import HackathonCard from './HackathonCard';
+import { useAuth } from '../../contexts/AuthContext';
+import hackathonServices from '../../api/hackathonServices';
+import userServices from '../../api/userServices';
+
+const HackathonList = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [hackathons, setHackathons] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [userApplications, setUserApplications] = useState([]);
+  const [availableCategories, setAvailableCategories] = useState([]);
+  const [applyingToHackathon, setApplyingToHackathon] = useState(null);
+
+  // Filter and sort states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedMode, setSelectedMode] = useState('all');
+  const [selectedDifficulty, setSelectedDifficulty] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [sortBy, setSortBy] = useState('start_date');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Real fetch function using updated hackathonServices
+  const fetchHackathons = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await hackathonServices.getHackathons();
+
+      if (response.success) {
+        setHackathons(response.data.hackathons || []);
+      } else {
+        throw new Error(response.error || 'Failed to fetch hackathons');
+      }
+    } catch (err) {
+      console.error('Failed to fetch hackathons:', err);
+      setError(err.message || 'Failed to load hackathons. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fix the category filter in filteredHackathons
+  const filteredHackathons = useMemo(() => {
+    let filtered = hackathons;
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(h =>
+        h.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        h.short_description.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Category filter - FIX: Check if categories exist and is array
+    if (selectedCategories.length > 0) {
+      filtered = filtered.filter(h =>
+        h.categories && Array.isArray(h.categories) &&
+        h.categories.some(cat => selectedCategories.includes(cat))
+      );
+    }
+
+    // Mode filter
+    if (selectedMode !== 'all') {
+      filtered = filtered.filter(h => h.mode === selectedMode);
+    }
+
+    // Status filter
+    if (selectedStatus !== 'all') {
+      filtered = filtered.filter(h => h.status === selectedStatus);
+    }
+
+    // Difficulty filter
+    if (selectedDifficulty !== 'all') {
+      filtered = filtered.filter(h => h.difficulty_level === selectedDifficulty);
+    }
+
+    // Sort - FIX: Handle date sorting properly
+    filtered.sort((a, b) => {
+      let aValue = a[sortBy];
+      let bValue = b[sortBy];
+
+      // Handle date fields
+      if (['start_date', 'end_date', 'registration_start', 'registration_end', 'created_at'].includes(sortBy)) {
+        aValue = new Date(aValue);
+        bValue = new Date(bValue);
+      }
+
+      // Handle numeric fields
+      if (['total_prize_pool', 'confirmed_participants', 'max_participants'].includes(sortBy)) {
+        aValue = parseFloat(aValue) || 0;
+        bValue = parseFloat(bValue) || 0;
+      }
+
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    return filtered;
+  }, [hackathons, searchTerm, selectedCategories, selectedMode, selectedStatus, selectedDifficulty, sortBy, sortOrder]);
+
+  // Add this after the useMemo to debug
+  useEffect(() => {
+    console.log('Filter Debug:');
+    console.log('Total hackathons:', hackathons.length);
+    console.log('Filtered hackathons:', filteredHackathons.length);
+    console.log('Search term:', searchTerm);
+    console.log('Selected categories:', selectedCategories);
+    console.log('Selected mode:', selectedMode);
+    console.log('Selected status:', selectedStatus);
+    console.log('Selected difficulty:', selectedDifficulty);
+  }, [filteredHackathons, searchTerm, selectedCategories, selectedMode, selectedStatus, selectedDifficulty]);
+
+  // Fetch categories from backend using updated API
+  const fetchCategories = useCallback(async () => {
+    try {
+      console.log('Fetching categories...');
+      const response = await hackathonServices.getCategories();
+      if (response && response.success) {
+        // Handle both direct array and nested data structure
+        const categories = Array.isArray(response.data) ?
+          response.data :
+          (response.data.categories || response.data || []);
+
+        setAvailableCategories(categories);
+        console.log('Categories loaded:', categories);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch categories:', err);
+      // Set default categories if API fails
+      setAvailableCategories([
+        'Web Development',
+        'Mobile Development',
+        'AI/ML',
+        'Blockchain',
+        'Game Development',
+        'IoT',
+        'Cybersecurity',
+        'Data Science'
+      ]);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    console.log('Component mounted - Initial load');
+    fetchHackathons();
+  }, [fetchHackathons]);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (searchTerm === '') {
+      setCurrentPage(1);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      console.log('Search triggered with term:', searchTerm);
+      setCurrentPage(1);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategories, selectedMode, selectedDifficulty, selectedStatus, sortBy, sortOrder]);
+
+  // Filter options
+  const modeOptions = [
+    { value: 'all', label: 'All Modes' },
+    { value: 'online', label: 'Online' },
+    { value: 'offline', label: 'In-Person' },
+    { value: 'hybrid', label: 'Hybrid' }
+  ];
+
+  const difficultyOptions = [
+    { value: 'all', label: 'All Levels' },
+    { value: 'beginner', label: 'Beginner' },
+    { value: 'intermediate', label: 'Intermediate' },
+    { value: 'advanced', label: 'Advanced' },
+    { value: 'expert', label: 'Expert' }
+  ];
+
+  const statusOptions = [
+    { value: 'all', label: 'All Status' },
+    { value: 'registration_open', label: 'Open for Registration' },
+    { value: 'ongoing', label: 'Live Now' },
+    { value: 'published', label: 'Upcoming' },
+    { value: 'completed', label: 'Completed' }
+  ];
+
+  const sortOptions = [
+    { value: 'start_date', label: 'Start Date' },
+    { value: 'registration_end', label: 'Registration Deadline' },
+    { value: 'total_prize_pool', label: 'Prize Pool' },
+    { value: 'confirmed_participants', label: 'Participants' },
+    { value: 'created_at', label: 'Recently Added' }
+  ];
+
+  // Handle organize hackathon - navigate to create page
+  const handleOrganizeHackathon = async () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      // Navigate to the create page (which now handles both GET and POST)
+      navigate('/hackathons/create');
+
+      // Optional: Update role in background if needed
+      if (user.role !== 'organizer' && user.role !== 'admin') {
+        userServices.updateProfile({ role: 'organizer' }, true)
+          .then(() => {
+            console.log('User role updated successfully');
+          })
+          .catch(error => {
+            console.warn('Role update failed:', error);
+          });
+      }
+    } catch (error) {
+      console.error('Navigation failed:', error);
+      alert('Failed to navigate to create page. Please try again.');
+    }
+  };
+
+  // Apply to hackathon using updated API
+  const handleApplyToHackathon = async (hackathon) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    // if (applyingToHackathon === hackathon.id) {
+    //   return; // Prevent double submission
+    // }
+
+    // setApplyingToHackathon(hackathon.id);
+
+    // try {
+    //   const applicationData = {
+    //     application_type: 'individual',
+    //     // skills_bringing: user.skills || ['JavaScript', 'React', 'Node.js'],
+    //     skills_bringing: user.skills || [],
+    //     looking_for_team: true,
+    //     preferred_team_size: 4,
+    //     // preferred_roles: ['developer', 'frontend'],
+    //     preferred_roles: [],
+    //     open_to_remote_collaboration: true,
+    //     project_ideas: `I'm excited to work on innovative solutions for ${hackathon.title}`
+    //   };
+
+    //   console.log('Applying with data:', applicationData);
+
+    //   // Use updated applyToHackathon method
+    //   const response = await hackathonServices.applyToHackathon(hackathon.id, applicationData);
+    //   console.log('Application response:', response);
+
+    //   if (response.success) {
+    //     // Refresh data to show updated application status
+    //     await fetchHackathons();
+
+    //     // Show success message based on application status
+    //     const application = response.data;
+    //     if (application.status === 'confirmed') {
+    //       alert(`🎉 Application to "${hackathon.title}" submitted and confirmed successfully!`);
+    //     } else if (application.status === 'payment_pending') {
+    //       alert(`✅ Application to "${hackathon.title}" submitted! Please complete payment to confirm your participation.`);
+    //     } else {
+    //       alert(`✅ Application to "${hackathon.title}" submitted successfully!`);
+    //     }
+    //   } else {
+    //     throw new Error(response.error || 'Application failed');
+    //   }
+    // } catch (error) {
+    //   console.error('Application failed:', error);
+    //   const errorMessage = error.response?.data?.error || error.message || 'Application failed';
+    //   alert(`❌ Failed to apply to "${hackathon.title}": ${errorMessage}`);
+    // } finally {
+    //   setApplyingToHackathon(null);
+    // }
+
+    navigate(`${hackathon.id}/register`)
+  };
+
+  // Navigate to hackathon detail page
+  const handleViewHackathon = (hackathonId) => {
+    navigate(`/hackathons/${hackathonId}`);
+  };
+
+  // Clear all filters and reload all hackathons
+  const clearAllFilters = () => {
+    console.log('Clearing all filters');
+    setSearchTerm('');
+    setSelectedCategories([]);
+    setSelectedMode('all');
+    setSelectedDifficulty('all');
+    setSelectedStatus('all');
+    setSortBy('start_date');
+    setSortOrder('asc');
+    setCurrentPage(1);
+  };
+
+  // Check if user has applied to hackathon
+  const hasUserApplied = (hackathonId) => {
+    return userApplications.some(app =>
+      (app.hackathon === hackathonId || app.hackathon_id === hackathonId)
+    );
+  };
+
+  // Get user application status for a hackathon
+  const getUserApplicationStatus = (hackathonId) => {
+    const application = userApplications.find(app =>
+      (app.hackathon === hackathonId || app.hackathon_id === hackathonId)
+    );
+    return application?.status || null;
+  };
+
+  // Load more hackathons (pagination)
+  const handleLoadMore = async () => {
+    if (loading || !hasNext) return;
+
+    console.log('Loading more hackathons, current page:', currentPage);
+    setCurrentPage(prev => prev + 1);
+  };
+
+  // Refresh hackathons
+  const refreshHackathons = () => {
+    console.log('Refreshing hackathons...');
+    setCurrentPage(1);
+    setError(null);
+    fetchHackathons();
+  };
+
+  if (loading && currentPage === 1 && hackathons.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center space-y-6"
+        >
+          <div className="relative">
+            <div className="w-20 h-20 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto"></div>
+            {/* <div className="absolute inset-0 w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mt-2 ml-2" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }}></div> */}
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Loading Hackathons</h3>
+            <p className="text-gray-600 dark:text-gray-400">Discovering amazing opportunities...</p>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center space-y-6 max-w-md mx-auto p-8"
+        >
+          <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
+            <X className="w-10 h-10 text-red-500" />
+          </div>
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Something went wrong</h3>
+            <p className="text-gray-600 dark:text-gray-400">{error}</p>
+          </div>
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={refreshHackathons}
+              className="flex items-center gap-2 px-8 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors font-semibold shadow-lg hover:shadow-xl"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Try Again
+            </button>
+            <button
+              onClick={clearAllFilters}
+              className="px-8 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors font-semibold shadow-lg hover:shadow-xl"
+            >
+              Reset Filters
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        {/* Simple Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-8"
+        >
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+            Discover Hackathons
+          </h1>
+          <p className="text-xl text-gray-600 dark:text-gray-400">
+            Join coding competitions and build amazing projects
+          </p>
+        </motion.div>
+
+        {/* Consolidated Search and Filters Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl border border-white/20 dark:border-gray-700/50 p-6 mb-8 shadow-xl"
+        >
+          <div className="flex flex-col lg:flex-row gap-4">
+
+            {/* Search */}
+            <div className="flex-1 relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                <Search className="w-5 h-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search hackathons..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                }}
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all placeholder-gray-500 dark:text-white"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                  }}
+                  className="absolute inset-y-0 right-0 flex items-center pr-4"
+                >
+                  <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                </button>
+              )}
+            </div>
+
+            {/* Organize Hackathon Button */}
+            <button
+              onClick={handleOrganizeHackathon}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-colors shadow-lg"
+            >
+              <Plus className="w-5 h-5" />
+              Organize Hackathon
+            </button>
+
+            {/* Filters Toggle */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2 px-4 py-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-200 dark:border-indigo-800"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              <span>Filters</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+
+          {/* Advanced Filters */}
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6 space-y-6"
+              >
+                {/* Filter Dropdowns */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Category Dropdown */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Category
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedCategories[0] || 'all'}
+                        onChange={(e) => {
+                          if (e.target.value === 'all') {
+                            setSelectedCategories([]);
+                          } else {
+                            setSelectedCategories([e.target.value]);
+                          }
+                        }}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 dark:text-white appearance-none"
+                      >
+                        <option value="all">All Categories</option>
+                        {availableCategories.map(category => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Mode Dropdown */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Mode
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedMode}
+                        onChange={(e) => {
+                          setSelectedMode(e.target.value);
+                        }}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 dark:text-white appearance-none"
+                      >
+                        {modeOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Difficulty Dropdown */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Difficulty
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedDifficulty}
+                        onChange={(e) => {
+                          setSelectedDifficulty(e.target.value);
+                        }}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 dark:text-white appearance-none"
+                      >
+                        {difficultyOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Status Dropdown */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Status
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedStatus}
+                        onChange={(e) => {
+                          setSelectedStatus(e.target.value);
+                        }}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 dark:text-white appearance-none"
+                      >
+                        {statusOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sort Options */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Sort By
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 dark:text-white appearance-none"
+                      >
+                        {sortOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Order
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={sortOrder}
+                        onChange={(e) => setSortOrder(e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 dark:text-white appearance-none"
+                      >
+                        <option value="asc">Ascending</option>
+                        <option value="desc">Descending</option>
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <button
+                      onClick={clearAllFilters}
+                      className="w-full px-4 py-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors font-medium"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+
+        {/* Results */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          {!loading && filteredHackathons.length === 0 ? (
+            <div className="text-center py-20">
+              <div className="w-32 h-32 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Search className="w-16 h-16 text-gray-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No hackathons found</h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                {searchTerm || selectedCategories.length > 0 || selectedMode !== 'all' || selectedDifficulty !== 'all' || selectedStatus !== 'all'
+                  ? 'Try adjusting your search or filters'
+                  : hackathons.length === 0
+                    ? 'No hackathons available in the database'
+                    : 'No hackathons match your current filters'
+                }
+              </p>
+              <div className="space-y-4">
+                {/* Only show clear filters if filters are active */}
+                {(searchTerm || selectedCategories.length > 0 || selectedMode !== 'all' || selectedDifficulty !== 'all' || selectedStatus !== 'all') && (
+                  <button
+                    onClick={clearAllFilters}
+                    className="px-6 py-3 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-colors font-semibold"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+                <br />
+                <button
+                  onClick={refreshHackathons}
+                  className="flex items-center gap-2 px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors font-semibold mx-auto"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh Page
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Results Header */}
+              {/* Results Header - Use filteredHackathons.length */}
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {filteredHackathons.length} Hackathons Found
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    {filteredHackathons.length !== hackathons.length
+                      ? `Filtered from ${hackathons.length} total results`
+                      : `Showing ${hackathons.length} results`
+                    }
+                  </p>
+                </div>
+                <button
+                  onClick={refreshHackathons}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-4 py-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
+
+
+              {/* Hackathon Grid - Use filteredHackathons instead of hackathons */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {filteredHackathons.map((hackathon, index) => (
+                  <motion.div
+                    key={hackathon.id}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <HackathonCard
+                      hackathon={hackathon}
+                      onApply={handleApplyToHackathon}
+                      onViewDetails={handleViewHackathon}
+                      userApplied={hasUserApplied(hackathon.id)}
+                      applicationStatus={getUserApplicationStatus(hackathon.id)}
+                      isApplying={applyingToHackathon === hackathon.id}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Load More */}
+              {hasNext && (
+                <div className="flex justify-center mt-12">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More Hackathons'
+                    )}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+export default HackathonList;
