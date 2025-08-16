@@ -257,56 +257,10 @@ const HackathonList = () => {
       navigate('/login');
       return;
     }
-
-    // if (applyingToHackathon === hackathon.id) {
-    //   return; // Prevent double submission
-    // }
-
-    // setApplyingToHackathon(hackathon.id);
-
-    // try {
-    //   const applicationData = {
-    //     application_type: 'individual',
-    //     // skills_bringing: user.skills || ['JavaScript', 'React', 'Node.js'],
-    //     skills_bringing: user.skills || [],
-    //     looking_for_team: true,
-    //     preferred_team_size: 4,
-    //     // preferred_roles: ['developer', 'frontend'],
-    //     preferred_roles: [],
-    //     open_to_remote_collaboration: true,
-    //     project_ideas: `I'm excited to work on innovative solutions for ${hackathon.title}`
-    //   };
-
-    //   console.log('Applying with data:', applicationData);
-
-    //   // Use updated applyToHackathon method
-    //   const response = await hackathonServices.applyToHackathon(hackathon.id, applicationData);
-    //   console.log('Application response:', response);
-
-    //   if (response.success) {
-    //     // Refresh data to show updated application status
-    //     await fetchHackathons();
-
-    //     // Show success message based on application status
-    //     const application = response.data;
-    //     if (application.status === 'confirmed') {
-    //       alert(`🎉 Application to "${hackathon.title}" submitted and confirmed successfully!`);
-    //     } else if (application.status === 'payment_pending') {
-    //       alert(`✅ Application to "${hackathon.title}" submitted! Please complete payment to confirm your participation.`);
-    //     } else {
-    //       alert(`✅ Application to "${hackathon.title}" submitted successfully!`);
-    //     }
-    //   } else {
-    //     throw new Error(response.error || 'Application failed');
-    //   }
-    // } catch (error) {
-    //   console.error('Application failed:', error);
-    //   const errorMessage = error.response?.data?.error || error.message || 'Application failed';
-    //   alert(`❌ Failed to apply to "${hackathon.title}": ${errorMessage}`);
-    // } finally {
-    //   setApplyingToHackathon(null);
-    // }
-
+    if (hackathon.organizer === user.id || hackathon.organizer_id === user.id) {
+      alert('You cannot apply to a hackathon you organize!');
+      return;
+    }
     navigate(`${hackathon.id}/register`)
   };
 
@@ -734,6 +688,7 @@ const HackathonList = () => {
                       userApplied={hasUserApplied(hackathon.id)}
                       applicationStatus={getUserApplicationStatus(hackathon.id)}
                       isApplying={applyingToHackathon === hackathon.id}
+                      isOrganizer={user && (hackathon.organizer === user.id || hackathon.organizer_id === user.id)}
                     />
                   </motion.div>
                 ))}

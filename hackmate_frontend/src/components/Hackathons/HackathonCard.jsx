@@ -15,24 +15,19 @@ const HackathonCard = ({
   onViewDetails,
   userApplied = false,
   applicationStatus = null,
-  isApplying = false
+  isApplying = false,
+  isOrganizer = false
 }) => {
   // Get current time in local timezone
   const now = new Date();
 
-  // ✅ CORRECT - Keep these as Date objects for comparisons
+  // Date objects for comparisons
   const startDate = parseISO(hackathon.start_date);
   const endDate = parseISO(hackathon.end_date);
   const registrationStart = parseISO(hackathon.registration_start);
   const registrationEnd = parseISO(hackathon.registration_end);
 
-  console.log(registrationStart)
-  console.log('Original registration_start string:', hackathon.registration_start);
-  console.log('Parsed registration_start (UTC string):', registrationStart.toUTCString());
-  console.log('Parsed registration_start (Local string):', registrationStart.toString());
-  console.log('Current time (local):', now.toString());
-
-  // Initialize banner image state
+  // Banner image state
   const [bannerImage, setBannerImage] = useState(
     `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/media/hackathons/banners/placeholder-image.jpg`
   );
@@ -50,7 +45,7 @@ const HackathonCard = ({
     }
   }, [hackathon.banner_image]);
 
-  // Enhanced status logic with proper timezone handling
+  // Status logic
   const getStatus = () => {
     if (now > endDate) return {
       label: 'Completed',
@@ -108,12 +103,6 @@ const HackathonCard = ({
   const isUpcoming = now < registrationStart &&
     hackathon.status === 'published';
 
-  console.log('Registration Start UTC:', registrationStart.toUTCString());
-  console.log('Registration End UTC:', registrationEnd.toUTCString());
-  console.log('Registration Open?:', isRegistrationOpen);
-  console.log('Upcoming?:', isUpcoming);
-
-  // Mode mapping
   const getModeInfo = () => {
     switch (hackathon.mode) {
       case 'online': return { icon: Globe, label: 'Online', color: 'text-green-500' };
@@ -126,7 +115,7 @@ const HackathonCard = ({
   const modeInfo = getModeInfo();
   const ModeIcon = modeInfo.icon;
 
-  // Prize formatting - Handle string values and parse properly
+  // Prize formatting
   const formatPrize = (amount) => {
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
     if (!numAmount || numAmount === 0) return 'No Prize';
@@ -135,7 +124,7 @@ const HackathonCard = ({
     return `₹${numAmount}`;
   };
 
-  // Calculate total prize from individual prizes if total_prize_pool is 0
+  // Calculate total prize
   const getTotalPrize = () => {
     const totalPool = parseFloat(hackathon.total_prize_pool) || 0;
 
@@ -160,7 +149,9 @@ const HackathonCard = ({
   };
 
   const handleApply = () => {
-    onApply && onApply(hackathon);
+    if (!isOrganizer) {
+      onApply && onApply(hackathon);
+    }
   };
 
   const handleViewDetails = () => {
@@ -319,9 +310,8 @@ const HackathonCard = ({
           </div>
         </div>
 
-        {/* Warnings - takes available space */}
+        {/* Info/warnings */}
         <div className="space-y-3 mb-4 flex-1">
-          {/* Show upcoming registration message */}
           {isUpcoming && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
               <Calendar className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
@@ -330,7 +320,6 @@ const HackathonCard = ({
               </span>
             </div>
           )}
-
           {isRegistrationOpen && spotsLeft <= 20 && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
               <Zap className="w-4 h-4 text-red-500 flex-shrink-0" />
@@ -339,7 +328,6 @@ const HackathonCard = ({
               </span>
             </div>
           )}
-
           {isRegistrationOpen && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
               <Timer className="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
@@ -348,7 +336,6 @@ const HackathonCard = ({
               </span>
             </div>
           )}
-
           {!isRegistrationOpen && !isUpcoming && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
               <ListEnd className="w-4 h-4 text-red-500 flex-shrink-0" />
@@ -359,7 +346,7 @@ const HackathonCard = ({
           )}
         </div>
 
-        {/* Footer - Fixed at bottom */}
+        {/* Footer - buttons */}
         <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700 mt-auto">
           <div className="space-y-1">
             <div className="text-sm text-gray-500 dark:text-gray-400">Prize Pool</div>
@@ -369,9 +356,8 @@ const HackathonCard = ({
               </span>
             </div>
           </div>
-
           <div className="flex items-center gap-3">
-            {/* External link */}
+            {/* View Details */}
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
@@ -380,52 +366,59 @@ const HackathonCard = ({
             >
               <ExternalLink className="w-5 h-5 text-gray-600 dark:text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400" />
             </motion.button>
-
-            {/* Apply button */}
-            {userApplied ? (
-              <div className={`flex items-center gap-2 px-6 py-3 rounded-xl border font-semibold ${applicationStatusDisplay?.color || 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'}`}>
-                <CheckCircle className="w-5 h-5" />
-                <span>{applicationStatusDisplay?.label || 'Applied'}</span>
-              </div>
-            ) : isRegistrationOpen && spotsLeft > 0 ? (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleApply}
-                disabled={isApplying}
-                className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
-              >
-                {isApplying ? (
-                  <>
-                    <Loader className="w-5 h-5 animate-spin" />
-                    <span>Applying...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Apply Now</span>
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </motion.button>
-            ) : isUpcoming ? (
-              <button
-                disabled
-                className="px-6 py-3 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-xl font-semibold cursor-not-allowed border border-purple-200 dark:border-purple-800"
-              >
-                Registration Soon
-              </button>
-            ) : (
-              <button
-                disabled
-                className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-xl font-semibold cursor-not-allowed"
-              >
-                {spotsLeft === 0 ? 'Full' : 'Closed'}
-              </button>
+            {/* Apply button logic */}
+            {isOrganizer && (
+              <span className="px-6 py-3 rounded-xl border font-semibold bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800 flex items-center gap-2 select-none cursor-default">
+                <Star className="w-5 h-5" />
+                {/* You are the organizer */}
+                Organizer
+              </span>
+            )}
+            {!isOrganizer && (
+              userApplied ? (
+                <div className={`flex items-center gap-2 px-6 py-3 rounded-xl border font-semibold ${applicationStatusDisplay?.color || 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'}`}>
+                  <CheckCircle className="w-5 h-5" />
+                  <span>{applicationStatusDisplay?.label || 'Applied'}</span>
+                </div>
+              ) : isRegistrationOpen && spotsLeft > 0 ? (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleApply}
+                  disabled={isApplying}
+                  className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
+                >
+                  {isApplying ? (
+                    <>
+                      <Loader className="w-5 h-5 animate-spin" />
+                      <span>Applying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Apply Now</span>
+                      <ArrowRight className="w-5 h-5" />
+                    </>
+                  )}
+                </motion.button>
+              ) : isUpcoming ? (
+                <button
+                  disabled
+                  className="px-6 py-3 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-xl font-semibold cursor-not-allowed border border-purple-200 dark:border-purple-800"
+                >
+                  Registration Soon
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-xl font-semibold cursor-not-allowed"
+                >
+                  {spotsLeft === 0 ? 'Full' : 'Closed'}
+                </button>
+              )
             )}
           </div>
         </div>
       </div>
-
       {/* Hover effect overlay */}
       <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-3xl"></div>
     </motion.div>

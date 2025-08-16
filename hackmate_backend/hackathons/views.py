@@ -5,12 +5,12 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from .models import Hackathon, HackathonApplication
 from .serializers import HackathonSerializer, HackathonCreateSerializer, HackathonApplicationCreateSerializer, HackathonApplicationSerializer
+from django.utils import timezone
 
 @api_view(['GET', 'POST'])
 def hackathon_list_view(request):
     if request.method == 'GET':
-        hackathons = Hackathon.objects.filter(status__in=['published'])
-        # print(Hackathon.objects.all())
+        hackathons = Hackathon.objects.filter(status__in=['published', 'registration_open'])
         serializer = HackathonSerializer(hackathons, many=True)
         return Response({'success': True, 'hackathons': serializer.data})
 
@@ -18,7 +18,6 @@ def hackathon_list_view(request):
         if not request.user.is_authenticated:
             return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
         serializer = HackathonCreateSerializer(data=request.data)
-        print(request.data)
         if serializer.is_valid():
             hackathon = serializer.save(organizer=request.user)
             return Response({'success': True, 'hackathon': HackathonSerializer(hackathon).data}, status=status.HTTP_201_CREATED)
@@ -51,22 +50,63 @@ def hackathon_detail_view(request, id):
 @permission_classes([IsAuthenticated])
 def hackathon_apply_view(request, id):
     hackathon = get_object_or_404(Hackathon, id=id)
-
+    
+    # Check if user already applied
     if HackathonApplication.objects.filter(user=request.user, hackathon=hackathon).exists():
         return Response({'error': 'Already applied'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Check if registration is still open
+    if not hackathon.is_registration_open:
+        return Response({'error': 'Registration is closed'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Prepare data for serialization
     data = request.data.copy()
     data['hackathon'] = hackathon.id
+    
+    # Determine status based on hackathon type and application preferences
+    if hackathon.is_free:
+        # For free hackathons
+        application_type = data.get('application_type', 'individual')
+        looking_for_team = data.get('looking_for_team', False)
+        
+        if application_type == 'individual' and not looking_for_team:
+            # Solo individual - confirmed immediately
+            data['status'] = 'confirmed'
+            data['payment_status'] = 'not_required'
+        else:
+            # Individual looking for team or team leader - needs processing
+            data['status'] = 'applied'
+            data['payment_status'] = 'not_required'
+    else:
+        # For paid hackathons - always payment pending first
+        data['status'] = 'payment_pending'
+        data['payment_status'] = 'pending'
+        # data['payment_deadline'] = timezone.now() + timezone.timedelta(hours=24)  # 24 hour deadline
+        data['payment_deadline'] = hackathon.registration_end
+    
+    # Create application
     serializer = HackathonApplicationCreateSerializer(data=data)
     if serializer.is_valid():
         application = serializer.save(user=request.user)
-        return Response({'success': True, 'application': HackathonApplicationSerializer(application).data}, status=status.HTTP_201_CREATED)
+        
+        # If confirmed immediately, update participant count
+        if application.status == 'confirmed':
+            hackathon.confirmed_participants += 1
+            hackathon.save(update_fields=['confirmed_participants'])
+            application.confirmed_at = timezone.now()
+            application.save(update_fields=['confirmed_at'])
+        
+        return Response({
+            'success': True, 
+            'application': HackathonApplicationSerializer(application).data
+        }, status=status.HTTP_201_CREATED)
+    
     return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_applications_view(request):
-    applications = HackathonApplication.objects.filter(user=request.user)
+    applications = HackathonApplication.objects.filter(user=request.user).select_related('hackathon')
     serializer = HackathonApplicationSerializer(applications, many=True)
     return Response({'success': True, 'applications': serializer.data})
 
