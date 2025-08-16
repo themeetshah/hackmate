@@ -13,6 +13,9 @@ import ProfilePage from './components/Profile/Profile';
 import HackathonCreate from './components/Hackathons/HackathonCreate';
 import HackathonDetail from './components/Hackathons/HackathonDetail';
 import HackathonRegister from './components/Hackathons/HackathonRegister';
+import ApplicationDetail from './components/Hackathons/ApplicationDetail';
+import MyHackathons from './components/Hackathons/MyHackathons';
+import HackathonStats from './components/Hackathons/HackathonStats';
 
 
 const ProtectedRoute = ({ children }) => {
@@ -79,6 +82,9 @@ function App() {
               <Route path="/hackathons/create" element={<HackathonCreate />} />
               <Route path="/hackathons/:id" element={<HackathonDetail />} />
               <Route path="/hackathons/:id/register" element={<HackathonRegister />} />
+              <Route path="/hackathons/applications/:applicationId" element={<ApplicationDetail />} />
+              <Route path="/hackathons/my" element={<MyHackathons />} />
+              <Route path="/hackathons/organized/:id/stats" element={<HackathonStats />} />
 
               {/* teams */}
               <Route path="teams" element={<TeamsPage />} />

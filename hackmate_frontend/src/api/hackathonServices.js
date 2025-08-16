@@ -4,6 +4,7 @@ const ENDPOINTS = {
     hackathons: '/hackathons/',
     hackathonDetail: (id) => `/hackathons/${id}/`,
     hackathonApply: (id) => `/hackathons/${id}/apply/`,
+    updatePayment: (applicationId) => `/hackathons/applications/${applicationId}/payment/`,
     myApplications: '/hackathons/my/applications/',
     myOrganizedHackathons: '/hackathons/my/organized/',
     categories: '/hackathons/api/categories/',
@@ -30,16 +31,25 @@ const hackathonServices = {
         }
     },
 
+    getHackathonApplications: async (hackathonId) => {
+        try {
+            const response = await api.get(`/hackathons/${hackathonId}/applications/`);
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to fetch applications' };
+        }
+    },
+
     // Create new hackathon
-        createHackathon: async (data) => {
-            try {
-                // console.log(data.banner_image)
-                const response = await api.post(ENDPOINTS.hackathons, data);
-                return { success: true, data: response.data };
-            } catch (error) {
-                return { success: false, error: error.message || 'Failed to create hackathon' };
-            }
-        },
+    createHackathon: async (data) => {
+        try {
+            // console.log(data.banner_image)
+            const response = await api.post(ENDPOINTS.hackathons, data);
+            return { success: true, data: response.data };
+        } catch (error) {
+            return { success: false, error: error.message || 'Failed to create hackathon' };
+        }
+    },
 
     // Apply to hackathon
     applyToHackathon: async (id, applicationData) => {
@@ -58,6 +68,35 @@ const hackathonServices = {
             return { success: true, data: response.data };
         } catch (error) {
             return { success: false, error: error.message || 'Failed to fetch applications' };
+        }
+    },
+
+    updateApplicationPayment: async (applicationId, paymentData) => {
+        try {
+            const response = await api.patch(ENDPOINTS.updatePayment(applicationId), paymentData);
+            return { success: true, data: response.data };
+        } catch (error) {
+            return { success: false, error: error.message || 'Failed to update payment' };
+        }
+    },
+
+    // Get specific application details
+    getApplicationDetails: async (applicationId) => {
+        try {
+            const response = await api.get(`/hackathons/applications/${applicationId}/`);
+            return { success: true, data: response.data };
+        } catch (error) {
+            return { success: false, error: error.message || 'Failed to fetch application details' };
+        }
+    },
+
+    // Withdraw application
+    withdrawApplication: async (applicationId) => {
+        try {
+            const response = await api.patch(`/hackathons/applications/${applicationId}/withdraw/`);
+            return { success: true, data: response.data };
+        } catch (error) {
+            return { success: false, error: error.message || 'Failed to withdraw application' };
         }
     },
 

@@ -55,7 +55,7 @@ const HackathonCreate = () => {
         is_featured: false,
         is_free: true,
         registration_fee: 0,
-        status: 'draft'
+        status: 'published'
     });
 
     // Input field states for dynamic arrays
@@ -145,6 +145,7 @@ const HackathonCreate = () => {
     };
 
     // Form validation
+    // Add this validation function to HackathonCreate.jsx
     const validateForm = () => {
         const newErrors = {};
 
@@ -173,6 +174,43 @@ const HackathonCreate = () => {
         if (formData.min_team_size < 1) newErrors.min_team_size = 'Minimum team size must be at least 1';
         if (formData.max_team_size < formData.min_team_size) {
             newErrors.max_team_size = 'Maximum team size must be >= minimum';
+        }
+
+        // ✅ NEW: Advanced participant and team size constraints
+        if (formData.registration_type === 'team') {
+            // For team-only hackathons
+            const maxPossibleTeams = Math.floor(formData.max_participants / formData.min_team_size);
+            const minRequiredParticipants = formData.min_team_size;
+
+            if (formData.max_participants < minRequiredParticipants) {
+                newErrors.max_participants = `For team-only events, max participants must be at least ${minRequiredParticipants} (min team size)`;
+            }
+
+            if (maxPossibleTeams < 1) {
+                newErrors.max_participants = `With current team size constraints, at least ${formData.min_team_size} participants are needed`;
+            }
+        } else if (formData.registration_type === 'both') {
+            // For mixed registration
+            const minRequiredForOneTeam = formData.min_team_size;
+            if (formData.max_participants < minRequiredForOneTeam) {
+                newErrors.max_participants = `To allow team registration, max participants must be at least ${minRequiredForOneTeam}`;
+            }
+        }
+
+        // Team size logical constraints
+        if (formData.registration_type !== 'individual') {
+            if (formData.min_team_size > formData.max_participants) {
+                newErrors.min_team_size = 'Minimum team size cannot exceed maximum participants';
+            }
+            if (formData.max_team_size > formData.max_participants) {
+                newErrors.max_team_size = 'Maximum team size cannot exceed maximum participants';
+            }
+
+            // Check if team formation is mathematically possible
+            const remainingSlots = formData.max_participants % formData.min_team_size;
+            if (remainingSlots > 0 && remainingSlots < formData.min_team_size && formData.registration_type === 'team') {
+                newErrors.max_participants = `With min team size of ${formData.min_team_size}, participants should be a multiple of team size or allow individual registration`;
+            }
         }
 
         // Mode-specific validations
@@ -359,7 +397,7 @@ const HackathonCreate = () => {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    {/* <div className="flex items-center gap-3">
                         <button
                             onClick={() => setPreviewMode(!previewMode)}
                             className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -367,7 +405,7 @@ const HackathonCreate = () => {
                             <Eye className="w-4 h-4" />
                             Preview
                         </button>
-                    </div>
+                    </div> */}
                 </div>
 
                 {/* Main Form */}
@@ -1165,14 +1203,14 @@ const HackathonCreate = () => {
                             </button>
 
                             <div className="flex items-center gap-4">
-                                <button
+                                {/* <button
                                     onClick={() => handleSubmit(false)}
                                     disabled={loading}
                                     className="flex items-center gap-2 px-6 py-3 border border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
                                 >
                                     <Save className="w-5 h-5" />
                                     {loading ? 'Saving...' : 'Save as Draft'}
-                                </button>
+                                </button> */}
 
                                 <button
                                     onClick={() => handleSubmit(true)}

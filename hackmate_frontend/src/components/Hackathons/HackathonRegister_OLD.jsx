@@ -1,15 +1,15 @@
 /* --------------------------------------------------------------------------
-   HackathonRegister.jsx · REDESIGNED PREMIUM EDITION - SIMPLIFIED INDIVIDUAL REGISTRATION
-   Professional registration with individual-only flow and confirmation-based limits
+   HackathonRegister.jsx · REDESIGNED PREMIUM EDITION WITH PAYMENT AND ORGANIZER PROTECTION
+   Professional multi-step registration with enhanced UI/UX, payment logic, and organizer restrictions
    -------------------------------------------------------------------------- */
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    ArrowLeft, Loader, Users, User, CheckCircle, Plus, X, Globe,
-    Code2, Trophy, Palette, Shield, Cpu, Database, Brain, Gamepad2,
-    CreditCard, Calendar, Clock, AlertTriangle, Info, Star,
-    ChevronRight, ChevronLeft, Briefcase, Send, Lightbulb
+    ArrowLeft, Loader, Users, User, CheckCircle, Sparkles, Plus, X, Globe,
+    Monitor, MapPin, Code2, Trophy, Target, Palette, Shield, Cpu, Database,
+    Brain, Gamepad2, Edit, CreditCard, Calendar, Clock, AlertTriangle, Info,
+    Star, Zap, ChevronRight, ChevronLeft, Award, Briefcase, Heart, Send, Lightbulb
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import hackathonServices from '../../api/hackathonServices';
@@ -40,6 +40,7 @@ const PremiumButton = ({ children, variant = "primary", loading = false, ...prop
         primary: "bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-700 hover:via-purple-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40",
         secondary: "bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 hover:from-emerald-600 hover:via-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40",
         outline: "border-2 border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-indigo-400 dark:hover:border-indigo-500",
+        ghost: "bg-gray-100/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600",
         premium: "bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 hover:from-yellow-500 hover:via-orange-600 hover:to-red-600 text-white shadow-lg shadow-orange-500/30 hover:shadow-xl hover:shadow-orange-500/40",
         warning: "bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40"
     };
@@ -66,6 +67,31 @@ const PremiumButton = ({ children, variant = "primary", loading = false, ...prop
         </motion.button>
     );
 };
+
+const ModernInput = ({ label, icon: Icon, error, ...props }) => (
+    <div className="space-y-2">
+        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+            {Icon && <Icon className="w-4 h-4 text-indigo-500" />}
+            {label}
+        </label>
+        <motion.div
+            whileFocus={{ scale: 1.01 }}
+            className="relative group"
+        >
+            <input
+                {...props}
+                className={`w-full px-4 py-3 bg-white/80 dark:bg-gray-800/80 border-2 
+                   ${error ? 'border-red-300' : 'border-gray-200 dark:border-gray-600'} 
+                   rounded-xl text-gray-900 dark:text-white placeholder-gray-400 
+                   focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 
+                   focus:ring-2 focus:ring-indigo-500/20 transition-all duration-300
+                   backdrop-blur-sm`}
+            />
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-500/5 to-purple-500/5 opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
+        </motion.div>
+        {error && <p className="text-red-500 text-xs font-medium">{error}</p>}
+    </div>
+);
 
 const ModernTextArea = ({ label, icon: Icon, error, ...props }) => (
     <div className="space-y-2">
@@ -95,7 +121,8 @@ const ModernTextArea = ({ label, icon: Icon, error, ...props }) => (
 const PremiumChip = ({ children, active, onClick, deletable, icon: Icon, color = "indigo" }) => {
     const colorVariants = {
         indigo: active ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600',
-        emerald: active ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30' : 'bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
+        emerald: active ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30' : 'bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600',
+        orange: active ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/30' : 'bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
     };
 
     return (
@@ -245,15 +272,67 @@ const ProgressIndicator = ({ currentStep, totalSteps, stepLabels }) => (
     </div>
 );
 
-/* ──────────────────────── Application Status Card ────────────────────────── */
-const ApplicationStatusCard = ({ application, hackathon, onMakePayment, makingPayment = false }) => {
-    const navigate = useNavigate();
+/* ──────────────────────── Registration Type Cards ────────────────────────── */
+const RegistrationTypeCard = ({ type, icon: Icon, title, description, selected, onClick, color, disabled = false }) => (
+    <motion.button
+        type="button"
+        onClick={disabled ? undefined : onClick} // ✅ Disable onClick when disabled
+        whileHover={disabled ? {} : { scale: 1.02, y: -2 }} // ✅ Disable hover animation when disabled
+        whileTap={disabled ? {} : { scale: 0.98 }} // ✅ Disable tap animation when disabled
+        disabled={disabled} // ✅ Add disabled attribute
+        className={`relative p-6 rounded-2xl border-2 transition-all duration-300 text-left w-full
+                ${disabled
+                ? 'border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 opacity-50 cursor-not-allowed' // ✅ Disabled styles
+                : selected
+                    ? `border-${color}-500 bg-${color}-50 dark:bg-${color}-900/20 shadow-lg shadow-${color}-500/20`
+                    : 'border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 hover:border-gray-300 dark:hover:border-gray-600'
+            }`}
+    >
+        <div className="flex items-start gap-4">
+            <div className={`p-3 rounded-xl ${disabled
+                ? 'bg-gray-300 dark:bg-gray-600 text-gray-500' // ✅ Disabled icon styles
+                : selected
+                    ? `bg-${color}-500 text-white`
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
+                }`}>
+                <Icon className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+                <h3 className={`font-bold text-lg mb-2 ${disabled
+                    ? 'text-gray-400 dark:text-gray-500' // ✅ Disabled title styles
+                    : selected
+                        ? `text-${color}-900 dark:text-${color}-100`
+                        : 'text-gray-900 dark:text-white'
+                    }`}>
+                    {title}
+                </h3>
+                <p className={`text-sm leading-relaxed ${disabled
+                    ? 'text-gray-400 dark:text-gray-500' // ✅ Disabled description styles
+                    : 'text-gray-600 dark:text-gray-400'
+                    }`}>
+                    {description}
+                </p>
+            </div>
+        </div>
+        {selected && !disabled && ( // ✅ Only show checkmark if selected and not disabled
+            <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className={`absolute top-4 right-4 w-6 h-6 bg-${color}-500 rounded-full flex items-center justify-center`}
+            >
+                <CheckCircle className="w-4 h-4 text-white" />
+            </motion.div>
+        )}
+    </motion.button>
+);
 
+/* ──────────────────────── Application Status Card ────────────────────────── */
+const ApplicationStatusCard = ({ application, hackathon, onEdit, onMakePayment, makingPayment = false }) => {
     const getStatusConfig = (status) => {
         const configs = {
             confirmed: { color: 'green', icon: CheckCircle, label: 'Confirmed', bg: 'bg-green-50 dark:bg-green-900/20' },
-            team_pending: { color: 'purple', icon: Users, label: 'Team Formation Pending', bg: 'bg-purple-50 dark:bg-purple-900/20' },
             payment_pending: { color: 'orange', icon: CreditCard, label: 'Payment Pending', bg: 'bg-orange-50 dark:bg-orange-900/20' },
+            team_pending: { color: 'purple', icon: Users, label: 'Team Formation Pending', bg: 'bg-purple-50 dark:bg-purple-900/20' },
             applied: { color: 'blue', icon: Clock, label: 'Under Review', bg: 'bg-blue-50 dark:bg-blue-900/20' },
             rejected: { color: 'red', icon: X, label: 'Rejected', bg: 'bg-red-50 dark:bg-red-900/20' }
         };
@@ -278,28 +357,9 @@ const ApplicationStatusCard = ({ application, hackathon, onMakePayment, makingPa
             </div>
 
             {/* Status Badge */}
-            <div className={`inline-flex items-center gap-3 px-6 py-3 rounded-full ${statusConfig.bg} border-2 mb-8`}
-                style={{
-                    borderColor: statusConfig.color === 'green' ? '#10b981' :
-                        statusConfig.color === 'purple' ? '#8b5cf6' :
-                            statusConfig.color === 'orange' ? '#f59e0b' :
-                                statusConfig.color === 'blue' ? '#3b82f6' :
-                                    statusConfig.color === 'red' ? '#ef4444' : '#6b7280'
-                }}>
-                <StatusIcon className="w-5 h-5" style={{
-                    color: statusConfig.color === 'green' ? '#059669' :
-                        statusConfig.color === 'purple' ? '#7c3aed' :
-                            statusConfig.color === 'orange' ? '#d97706' :
-                                statusConfig.color === 'blue' ? '#2563eb' :
-                                    statusConfig.color === 'red' ? '#dc2626' : '#4b5563'
-                }} />
-                <span className="font-bold" style={{
-                    color: statusConfig.color === 'green' ? '#065f46' :
-                        statusConfig.color === 'purple' ? '#581c87' :
-                            statusConfig.color === 'orange' ? '#92400e' :
-                                statusConfig.color === 'blue' ? '#1e40af' :
-                                    statusConfig.color === 'red' ? '#991b1b' : '#374151'
-                }}>
+            <div className={`inline-flex items-center gap-3 px-6 py-3 rounded-full ${statusConfig.bg} border border-${statusConfig.color}-200 dark:border-${statusConfig.color}-800 mb-8`}>
+                <StatusIcon className={`w-5 h-5 text-${statusConfig.color}-600`} />
+                <span className={`font-bold text-${statusConfig.color}-800 dark:text-${statusConfig.color}-200`}>
                     {statusConfig.label}
                 </span>
             </div>
@@ -310,8 +370,14 @@ const ApplicationStatusCard = ({ application, hackathon, onMakePayment, makingPa
                     <div className="p-4 bg-white/50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
                         <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Registration Type</h3>
                         <div className="flex items-center gap-3">
-                            <User className="w-5 h-5 text-indigo-500" />
-                            <span className="font-semibold text-gray-900 dark:text-white">Individual</span>
+                            {application.application_type === 'team_leader' ? (
+                                <Users className="w-5 h-5 text-purple-500" />
+                            ) : (
+                                <User className="w-5 h-5 text-indigo-500" />
+                            )}
+                            <span className="font-semibold text-gray-900 dark:text-white capitalize">
+                                {application.application_type.replace('_', ' ')}
+                            </span>
                         </div>
                     </div>
 
@@ -330,6 +396,13 @@ const ApplicationStatusCard = ({ application, hackathon, onMakePayment, makingPa
                 </div>
 
                 <div className="space-y-6">
+                    {application.preferred_team_size && (
+                        <div className="p-4 bg-white/50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Team Size</h3>
+                            <p className="font-semibold text-gray-900 dark:text-white">{application.preferred_team_size} members</p>
+                        </div>
+                    )}
+
                     <div className="flex flex-wrap gap-3">
                         {application.looking_for_team && (
                             <div className="flex items-center gap-2 px-3 py-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
@@ -398,33 +471,8 @@ const ApplicationStatusCard = ({ application, hackathon, onMakePayment, makingPa
                 </div>
             )}
 
-            {/* Team Formation Pending Status */}
-            {application.status === 'team_pending' && (
-                <div className="mt-8 p-6 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border border-purple-200 dark:border-purple-800 rounded-xl">
-                    <div className="flex items-center gap-3 mb-3">
-                        <Users className="w-6 h-6 text-purple-600" />
-                        <h4 className="font-bold text-purple-800 dark:text-purple-200">Team Formation Required</h4>
-                    </div>
-                    <p className="text-purple-700 dark:text-purple-300">
-                        Your registration is confirmed! You now need to form or join a team before the hackathon starts.
-                        {application.payment_status === 'completed' && application.amount_paid > 0 && (
-                            <><br /><span className="text-sm">Payment of ₹{application.amount_paid} completed successfully.</span></>
-                        )}
-                    </p>
-                    <div className="mt-4">
-                        <PremiumButton
-                            onClick={() => navigate('/teams')}
-                            variant="secondary"
-                        >
-                            <Users className="w-4 h-4" />
-                            Go to Team Formation
-                        </PremiumButton>
-                    </div>
-                </div>
-            )}
-
-            {/* Payment pending section - only if max capacity not reached */}
-            {application.status === 'payment_pending' && application.payment_status === 'pending' && hackathon.confirmed_participants < hackathon.max_participants && (
+            {/* Update the payment pending section in ApplicationStatusCard */}
+            {application.status === 'payment_pending' && application.payment_status === 'pending' && (
                 <div className="mt-8 p-6 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 border border-orange-200 dark:border-orange-800 rounded-xl">
                     <div className="flex items-center gap-3 mb-3">
                         <CreditCard className="w-6 h-6 text-orange-600" />
@@ -432,9 +480,6 @@ const ApplicationStatusCard = ({ application, hackathon, onMakePayment, makingPa
                     </div>
                     <p className="text-orange-700 dark:text-orange-300 mb-4">
                         Complete your payment of <span className="font-bold">₹{hackathon.registration_fee}</span> to confirm your participation.
-                        {hackathon.registration_type === 'team' && (
-                            <><br /><span className="text-sm">After payment, you'll need to form or join a team.</span></>
-                        )}
                         <br />
                         <span className="text-sm">Payment deadline: {new Date(application.payment_deadline || hackathon.registration_end).toLocaleDateString()}</span>
                     </p>
@@ -450,64 +495,52 @@ const ApplicationStatusCard = ({ application, hackathon, onMakePayment, makingPa
                 </div>
             )}
 
-            {/* Max capacity reached - no more payments */}
-            {application.status === 'payment_pending' && hackathon.confirmed_participants >= hackathon.max_participants && (
-                <div className="mt-8 p-6 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-800 rounded-xl">
-                    <div className="flex items-center gap-3 mb-3">
-                        <X className="w-6 h-6 text-red-600" />
-                        <h4 className="font-bold text-red-800 dark:text-red-200">Registration Closed</h4>
-                    </div>
-                    <p className="text-red-700 dark:text-red-300">
-                        Unfortunately, the hackathon has reached its maximum capacity of {hackathon.max_participants} confirmed participants.
-                        Your application will be moved to rejected status.
-                    </p>
-                </div>
-            )}
-
-            {/* Confirmed status */}
-            {application.status === 'confirmed' && (
+            {application.status === 'confirmed' && application.payment_status === 'completed' && (
                 <div className="mt-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-xl">
                     <div className="flex items-center gap-3 mb-3">
                         <CheckCircle className="w-6 h-6 text-green-600" />
                         <h4 className="font-bold text-green-800 dark:text-green-200">Registration Confirmed!</h4>
                     </div>
                     <p className="text-green-700 dark:text-green-300">
-                        {hackathon.registration_type === 'individual'
-                            ? "You're all set for the individual hackathon. Check your email for further updates and event details."
-                            : "You're confirmed for the hackathon! You can now participate individually or form/join teams."
-                        }
+                        You're all set for the hackathon. Check your email for further updates and event details.
                         {application.amount_paid > 0 && (
                             <><br /><span className="text-sm">Payment of ₹{application.amount_paid} completed successfully.</span></>
                         )}
-                    </p>
-                    {hackathon.registration_type === 'both' && application.looking_for_team && (
-                        <div className="mt-4">
-                            <PremiumButton
-                                onClick={() => navigate('/teams')}
-                                variant="secondary"
-                            >
-                                <Users className="w-4 h-4" />
-                                Find or Create Team
-                            </PremiumButton>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Rejected status */}
-            {application.status === 'rejected' && (
-                <div className="mt-8 p-6 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-800 rounded-xl">
-                    <div className="flex items-center gap-3 mb-3">
-                        <X className="w-6 h-6 text-red-600" />
-                        <h4 className="font-bold text-red-800 dark:text-red-200">Application Rejected</h4>
-                    </div>
-                    <p className="text-red-700 dark:text-red-300">
-                        Unfortunately, your application was not selected. The hackathon reached its capacity limit before your application could be confirmed.
                     </p>
                 </div>
             )}
         </HeroCard>
     );
+};
+
+const checkRegistrationAvailability = (hackathon) => {
+    const remainingSpots = hackathon.max_participants - hackathon.confirmed_participants;
+
+    if (hackathon.registration_type === 'both') {
+        return {
+            canRegisterIndividual: remainingSpots > 0,
+            canRegisterTeam: remainingSpots >= hackathon.min_team_size,
+            remainingSpots
+        };
+    } else if (hackathon.registration_type === 'team') {
+        return {
+            canRegisterIndividual: false,
+            canRegisterTeam: remainingSpots >= hackathon.min_team_size,
+            remainingSpots
+        };
+    } else if (hackathon.registration_type === 'individual') {
+        return {
+            canRegisterIndividual: remainingSpots > 0,
+            canRegisterTeam: false,
+            remainingSpots
+        };
+    }
+
+    return {
+        canRegisterIndividual: false,
+        canRegisterTeam: false,
+        remainingSpots: 0
+    };
 };
 
 /* ─────────────────────────── Main Component ────────────────────────────── */
@@ -532,38 +565,24 @@ const HackathonRegister = () => {
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
     const [userApplication, setUserApplication] = useState(null);
+    const [showEditForm, setShowEditForm] = useState(false);
     const [makingPayment, setMakingPayment] = useState(false);
     const [isOrganizer, setIsOrganizer] = useState(false);
 
-    // Form state - Simplified for individual registration only
+    // Form state - Initialize with proper defaults
     const [step, setStep] = useState(0);
+    const [regType, setRegType] = useState('individual'); // This will be updated based on hackathon constraints
     const [lookingTeam, setLookingTeam] = useState(false);
     const [skills, setSkills] = useState(user?.skills ?? []);
     const [roles, setRoles] = useState([]);
+    const [prefTeamSize, setPrefTeamSize] = useState(2);
     const [remoteCollab, setRemoteCollab] = useState(true);
     const [projectIdeas, setProjectIdeas] = useState('');
-
+    const [availability, setAvailability] = useState({})
     // Form validation errors
     const [errors, setErrors] = useState({});
 
     const stepLabels = ['Registration Details', 'Additional Information'];
-
-    // Helper to determine if team collaboration option should show
-    const shouldShowTeamOption = () => {
-        if (!hackathon) return false;
-        // Only show team collaboration option if hackathon allows both types
-        return hackathon.registration_type === 'both';
-    };
-
-    // Move success effect outside of return statement
-    useEffect(() => {
-        if (success && success.id) {
-            const timer = setTimeout(() => {
-                navigate(`/hackathons/applications/${success.id}`);
-            }, 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [success, navigate]);
 
     // Data fetching
     useEffect(() => {
@@ -572,6 +591,60 @@ const HackathonRegister = () => {
                 const { success, data, error } = await hackathonServices.getHackathonById(id);
                 if (success) {
                     setHackathon(data.hackathon);
+                    setPrefTeamSize(data.hackathon.min_team_size);
+
+                    // Check registration availability
+                    const currentAvailability = checkRegistrationAvailability(data.hackathon);
+                    setAvailability(currentAvailability);
+                    console.log(data.hackathon.registration_type)
+                    console.log(currentAvailability, availability)
+
+                    if (currentAvailability.remainingSpots <= 0) {
+                        showError('This hackathon is full. No more registrations accepted.');
+                        return;
+                    }
+
+                    // ✅ FIX: Set proper default registration type based on hackathon constraints
+                    const individualAllowed = ['individual', 'both'].includes(data.hackathon.registration_type);
+                    const teamAllowed = ['team', 'both'].includes(data.hackathon.registration_type);
+
+                    if (!individualAllowed && teamAllowed) {
+                        if (currentAvailability.canRegisterTeam) {
+                            setRegType('team');
+                            showInfo('This hackathon only accepts team registrations');
+                        } else {
+                            showError('Not enough spots left for team formation');
+                            return;
+                        }
+                    } else if (individualAllowed && !teamAllowed) {
+                        // Individual only hackathon
+                        if (currentAvailability.canRegisterIndividual) {
+                            setRegType('individual');
+                            showInfo('This hackathon only accepts individual registrations');
+                        } else {
+                            showError('No individual spots remaining');
+                            return;
+                        }
+                        // } else if (data.hackathon.registration_type === 'both') {
+                        //     console.log(currentAvailability)
+                        //     if (!currentAvailability.canRegisterTeam) {
+                        //         setRegType('individual');
+                        //         showWarning('Team registration disabled - not enough spots left');
+                        //     }
+                    } else if (data.hackathon.registration_type === 'both') {
+                        // Default to individual if team registration is not possible
+                        if (!currentAvailability.canRegisterTeam && currentAvailability.canRegisterIndividual) {
+                            setRegType('individual');
+                            showWarning('Team registration disabled - not enough spots left');
+                        } else if (!currentAvailability.canRegisterIndividual && currentAvailability.canRegisterTeam) {
+                            setRegType('team');
+                            showWarning('Individual registration disabled - insufficient spots');
+                        } else if (!currentAvailability.canRegisterIndividual && !currentAvailability.canRegisterTeam) {
+                            showError('Registration is full');
+                            return;
+                        }
+                        // If both are available, keep default 'individual'
+                    }
 
                     // Check if current user is the organizer
                     if (user) {
@@ -583,7 +656,7 @@ const HackathonRegister = () => {
 
                         if (isCurrentUserOrganizer) {
                             showWarning('You are the organizer of this hackathon and cannot register');
-                            return;
+                            return; // Don't fetch applications if organizer
                         }
 
                         try {
@@ -591,9 +664,21 @@ const HackathonRegister = () => {
                             if (appResponse.success) {
                                 const existingApp = appResponse.data.applications.find(app => app.hackathon === parseInt(id));
                                 if (existingApp) {
+                                    // Redirect to application detail page instead of showing status card
                                     navigate(`/hackathons/applications/${existingApp.id}`);
                                     return;
                                 }
+                                // if (existingApp) {
+                                //     setUserApplication(existingApp);
+                                //     setRegType(existingApp.application_type === 'team_leader' ? 'team' : 'individual');
+                                //     setLookingTeam(existingApp.looking_for_team || false);
+                                //     setSkills(existingApp.skills_bringing || []);
+                                //     setRoles(existingApp.preferred_roles || []);
+                                //     setPrefTeamSize(existingApp.preferred_team_size || data.hackathon.min_team_size);
+                                //     setRemoteCollab(existingApp.open_to_remote_collaboration ?? true);
+                                //     setProjectIdeas(existingApp.project_ideas || '');
+                                //     showInfo('Found your existing application');
+                                // }
                             }
                         } catch (appError) {
                             showInfo('Ready to create new application');
@@ -610,7 +695,7 @@ const HackathonRegister = () => {
                 setLoading(false);
             }
         })();
-    }, [id, user]);
+    }, [id, user, navigate]);
 
     // Validation
     const validateStep = (stepNum) => {
@@ -619,6 +704,12 @@ const HackathonRegister = () => {
         if (stepNum === 0) {
             if (skills.length === 0) {
                 newErrors.skills = 'Please add at least one skill';
+            }
+            if (regType === 'team' && prefTeamSize < hackathon.min_team_size) {
+                newErrors.teamSize = `Team size must be at least ${hackathon.min_team_size} members`;
+            }
+            if (regType === 'team' && prefTeamSize > hackathon.max_team_size) {
+                newErrors.teamSize = `Team size cannot exceed ${hackathon.max_team_size} members`;
             }
         }
 
@@ -635,7 +726,7 @@ const HackathonRegister = () => {
         }
     };
 
-    // Updated handleSubmit with proper status logic
+    // Update the handleSubmit function for proper redirects
     const handleSubmit = async () => {
         if (!user) {
             showError('Please log in to submit your application');
@@ -643,6 +734,7 @@ const HackathonRegister = () => {
             return;
         }
 
+        // Double-check organizer status before submission
         if (isOrganizer) {
             showError('You cannot register for your own hackathon!');
             return;
@@ -667,22 +759,18 @@ const HackathonRegister = () => {
             return;
         }
 
-        // Determine if team collaboration is needed based on registration type
-        let finalLookingTeam = false;
-        if (hackathon.registration_type === 'team') {
-            // Team required - set looking_for_team to true
-            finalLookingTeam = true;
-        } else if (hackathon.registration_type === 'both') {
-            // Optional - use user's choice
-            finalLookingTeam = lookingTeam;
+        if (hackathon.confirmed_participants >= hackathon.max_participants) {
+            showError('This hackathon is full. No more registrations accepted.');
+            return;
         }
-        // For 'individual' type, finalLookingTeam stays false
 
+        // Prepare complete and correct payload
         const payload = {
             hackathon: parseInt(id),
-            application_type: 'individual',
+            application_type: regType === 'team' ? 'team_leader' : 'individual',
             skills_bringing: skills,
-            looking_for_team: finalLookingTeam,
+            looking_for_team: regType === 'individual' ? lookingTeam : false,
+            preferred_team_size: regType === 'team' ? prefTeamSize : null,
             preferred_roles: roles,
             open_to_remote_collaboration: remoteCollab,
             project_ideas: projectIdeas || '',
@@ -700,32 +788,53 @@ const HackathonRegister = () => {
                 const application = data.application;
                 setSuccess(application);
 
-                // Provide status-specific feedback
                 if (application.status === 'confirmed') {
-                    if (hackathon.registration_type === 'individual') {
-                        showSuccess('🎉 Registration confirmed! You\'re all set for the individual hackathon!');
-                    } else {
-                        showSuccess('🎉 Registration confirmed! You can now form or join teams.');
-                    }
-                } else if (application.status === 'team_pending') {
-                    showSuccess('✅ Registration successful! Team formation is required before the hackathon starts.');
-                } else if (application.status === 'payment_pending') {
-                    if (hackathon.confirmed_participants >= hackathon.max_participants) {
-                        showWarning('Hackathon is full. Payment not required. Your application will be rejected.');
-                    } else {
-                        showSuccess('Application submitted! Please complete payment to confirm your participation.');
+                    showSuccess('🎉 Registration confirmed! You\'re all set for the hackathon!');
+
+                    // Update confirmed participants count
+                    setHackathon(prev => ({
+                        ...prev,
+                        confirmed_participants: prev.confirmed_participants + 1
+                    }));
+
+                    // Handle redirects based on registration type
+                    if (regType === 'individual' && !lookingTeam) {
                         setTimeout(() => {
-                            showWarning(`Payment of ₹${hackathon.registration_fee} required to confirm registration`);
+                            showInfo('You\'re registered as a solo participant. Good luck!');
                         }, 2000);
+                    } else if (lookingTeam) {
+                        setTimeout(() => {
+                            showInfo('Redirecting to team matching...');
+                            navigate('/matching');
+                        }, 3000);
                     }
                 } else if (application.status === 'applied') {
-                    showSuccess('Application submitted successfully! You will be notified about confirmation.');
+                    showSuccess('Application submitted successfully!');
+
+                    if (regType === 'team') {
+                        setTimeout(() => {
+                            showInfo('Redirecting to team formation...');
+                            navigate('/teams');
+                        }, 3000);
+                    } else if (lookingTeam) {
+                        setTimeout(() => {
+                            showInfo('Redirecting to team matching...');
+                            navigate('/matching');
+                        }, 3000);
+                    }
+                } else if (application.status === 'payment_pending') {
+                    showSuccess('Application submitted! Please complete payment to confirm your participation.');
+                    setTimeout(() => {
+                        showWarning(`Payment of ₹${hackathon.registration_fee} required to confirm registration`);
+                    }, 2000);
                 }
 
             } else {
                 if (error.includes('Already applied')) {
                     showError('You have already applied to this hackathon');
                     window.location.reload();
+                } else if (error.includes('full') || error.includes('capacity')) {
+                    showError('This hackathon is full. Try joining the waitlist!');
                 } else if (error.includes('Organizers cannot apply')) {
                     showError('You cannot apply to your own hackathon!');
                     setIsOrganizer(true);
@@ -741,22 +850,18 @@ const HackathonRegister = () => {
         }
     };
 
-    // Updated payment handler with proper status transitions
+    // Update the payment handler
     const handleMakePayment = async () => {
         if (!userApplication || userApplication.status !== 'payment_pending') return;
-
-        // Check if hackathon is still accepting confirmations
-        if (hackathon.confirmed_participants >= hackathon.max_participants) {
-            showError('Sorry, the hackathon has reached its maximum capacity. Payment is no longer accepted.');
-            return;
-        }
 
         setMakingPayment(true);
         showInfo('Processing payment...');
 
         try {
+            // Simulate payment processing delay
             await new Promise(resolve => setTimeout(resolve, 2000));
 
+            // Update payment via backend
             const paymentData = {
                 amount_paid: hackathon.registration_fee,
                 payment_id: `payment_${Date.now()}`,
@@ -769,14 +874,24 @@ const HackathonRegister = () => {
 
             if (success) {
                 setUserApplication(data.application);
+
+                // Update hackathon confirmed participants count
                 setHackathon(prev => ({ ...prev, confirmed_participants: prev.confirmed_participants + 1 }));
 
-                // Check final status after payment
-                if (data.application.status === 'confirmed') {
-                    showSuccess('🎉 Payment confirmed! Your individual registration is complete!');
-                } else if (data.application.status === 'team_pending') {
-                    showSuccess('🎉 Payment confirmed! Now you need to form or join a team.');
-                }
+                showSuccess('🎉 Payment confirmed! Your registration is now complete!');
+
+                // Handle post-payment redirects
+                setTimeout(() => {
+                    if (userApplication.application_type === 'team_leader') {
+                        showInfo('Redirecting to team formation...');
+                        navigate('/teams');
+                    } else if (userApplication.looking_for_team) {
+                        showInfo('Redirecting to team matching...');
+                        navigate('/matching');
+                    } else {
+                        showInfo('Welcome to the hackathon! Check your email for further details.');
+                    }
+                }, 2000);
             } else {
                 showError(error || 'Payment update failed');
             }
@@ -788,6 +903,7 @@ const HackathonRegister = () => {
             setMakingPayment(false);
         }
     };
+
 
     /* Loading State */
     if (loading) {
@@ -922,8 +1038,17 @@ const HackathonRegister = () => {
         );
     }
 
-    // Success state
-    if (success) {
+    // Update the success state to show proper messages and handle redirects
+    useEffect(() => {
+        if (success && success.id) {
+            const timer = setTimeout(() => {
+                navigate(`/hackathons/applications/${success.id}`);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [success]);
+
+    if (success && !showEditForm) {
         return (
             <div className={`${theme === 'dark' ? 'dark' : ''} min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900/20 flex items-center justify-center px-4`}>
                 <HeroCard className="max-w-lg text-center p-8">
@@ -945,9 +1070,8 @@ const HackathonRegister = () => {
                         <div>
                             <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
                                 {success.status === 'confirmed' ? 'Registration Confirmed!' :
-                                    success.status === 'team_pending' ? 'Team Formation Required!' :
-                                        success.status === 'payment_pending' ? 'Payment Required!' :
-                                            'Application Submitted!'}
+                                    success.status === 'payment_pending' ? 'Payment Required!' :
+                                        'Application Submitted!'}
                             </h2>
                             <div className="space-y-3">
                                 <p className="text-gray-700 dark:text-gray-300">
@@ -956,34 +1080,32 @@ const HackathonRegister = () => {
                                     </span>
                                 </p>
 
+                                {/* Status-specific messages with redirects */}
                                 {success.status === 'confirmed' && (
                                     <div className="flex items-center justify-center gap-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
                                         <Star className="w-5 h-5 text-green-600" />
                                         <span className="text-green-800 dark:text-green-200 font-semibold">
-                                            {hackathon.registration_type === 'individual'
-                                                ? 'Individual Registration Complete!'
-                                                : hackathon.registration_type === 'team'
-                                                    ? 'Registration Complete! Team formation required.'
-                                                    : 'Registration Complete!'
-                                            }
+                                            {success.application_type === 'individual' && !success.looking_for_team
+                                                ? 'Solo Registration Complete!'
+                                                : 'Registration Complete!'}
                                         </span>
                                     </div>
                                 )}
 
-                                {success.status === 'team_pending' && (
+                                {success.status === 'applied' && success.application_type === 'team_leader' && (
                                     <div className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
                                         <Users className="w-5 h-5 text-purple-600" />
                                         <span className="text-purple-800 dark:text-purple-200 font-semibold">
-                                            Registration Complete! Team formation pending.
+                                            Team Leader Registered! Redirecting to team formation...
                                         </span>
                                     </div>
                                 )}
 
-                                {success.status === 'applied' && (
+                                {success.status === 'applied' && success.looking_for_team && (
                                     <div className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                                        <Clock className="w-5 h-5 text-blue-600" />
+                                        <Users className="w-5 h-5 text-blue-600" />
                                         <span className="text-blue-800 dark:text-blue-200 font-semibold">
-                                            Under Review - You will be notified about confirmation
+                                            Looking for team! Redirecting to matching...
                                         </span>
                                     </div>
                                 )}
@@ -992,9 +1114,7 @@ const HackathonRegister = () => {
                                     <div className="flex items-center justify-center gap-2 px-4 py-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
                                         <CreditCard className="w-5 h-5 text-orange-600" />
                                         <span className="text-orange-800 dark:text-orange-200 font-semibold">
-                                            {hackathon.confirmed_participants >= hackathon.max_participants
-                                                ? 'Hackathon Full - No Payment Required'
-                                                : `Payment Required: ₹${hackathon.registration_fee}`}
+                                            Payment Required: ₹{hackathon.registration_fee}
                                         </span>
                                     </div>
                                 )}
@@ -1009,6 +1129,341 @@ const HackathonRegister = () => {
             </div>
         );
     }
+    const shouldShowForm = !userApplication || showEditForm;
+    const individualAllowed = ['individual', 'both'].includes(hackathon.registration_type);
+    const teamAllowed = ['team', 'both'].includes(hackathon.registration_type);
+
+    // Add these condition checks after the existing state checks and before the main form
+
+    /* ─────── Registration Availability Checks ─────── */
+
+    // Check if hackathon is completely full
+    if (availability.remainingSpots <= 0) {
+        return (
+            <div className={`${theme === 'dark' ? 'dark' : ''} min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 dark:from-gray-900 dark:via-gray-800 dark:to-red-900/20 flex items-center justify-center px-4`}>
+                <HeroCard className="max-w-md text-center p-8">
+                    <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <X className="w-10 h-10 text-red-600 dark:text-red-400" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Registration Full</h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                        This hackathon has reached its maximum capacity of {hackathon.max_participants} participants.
+                    </p>
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg mb-6">
+                        <p className="text-red-800 dark:text-red-200 text-sm">
+                            🚫 No spots remaining ({hackathon.confirmed_participants}/{hackathon.max_participants})
+                        </p>
+                    </div>
+                    <div className="space-y-3">
+                        <PremiumButton onClick={() => navigate(`/hackathons/${id}`)} variant="primary">
+                            <Info className="w-4 h-4" />
+                            View Hackathon Details
+                        </PremiumButton>
+                        <PremiumButton onClick={() => navigate('/hackathons')} variant="outline">
+                            <ArrowLeft className="w-4 h-4" />
+                            Browse Other Hackathons
+                        </PremiumButton>
+                    </div>
+                </HeroCard>
+            </div>
+        );
+    }
+
+    // Check if registration type is individual-only but no individual spots available
+    if (hackathon.registration_type === 'individual' && !availability.canRegisterIndividual) {
+        return (
+            <div className={`${theme === 'dark' ? 'dark' : ''} min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50 dark:from-gray-900 dark:via-gray-800 dark:to-orange-900/20 flex items-center justify-center px-4`}>
+                <HeroCard className="max-w-md text-center p-8">
+                    <div className="w-20 h-20 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <User className="w-10 h-10 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Individual Registration Unavailable</h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                        This hackathon only accepts individual registrations, but no individual spots are currently available.
+                    </p>
+                    <div className="p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg mb-6">
+                        <div className="flex items-center gap-3">
+                            <User className="w-5 h-5 text-orange-600" />
+                            <div className="text-left">
+                                <p className="text-orange-800 dark:text-orange-200 text-sm font-medium">Individual Registration Only</p>
+                                <p className="text-orange-700 dark:text-orange-300 text-xs">
+                                    {availability.remainingSpots} spots remaining, but individual registration is full
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="space-y-3">
+                        <PremiumButton onClick={() => navigate(`/hackathons/${id}`)} variant="primary">
+                            <Info className="w-4 h-4" />
+                            View Hackathon Details
+                        </PremiumButton>
+                        <PremiumButton onClick={() => navigate('/hackathons')} variant="outline">
+                            <ArrowLeft className="w-4 h-4" />
+                            Browse Other Hackathons
+                        </PremiumButton>
+                    </div>
+                </HeroCard>
+            </div>
+        );
+    }
+
+    // Check if registration type is team-only but no team spots available
+    if (hackathon.registration_type === 'team' && !availability.canRegisterTeam) {
+        return (
+            <div className={`${theme === 'dark' ? 'dark' : ''} min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900/20 flex items-center justify-center px-4`}>
+                <HeroCard className="max-w-md text-center p-8">
+                    <div className="w-20 h-20 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Users className="w-10 h-10 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Team Registration Unavailable</h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                        This hackathon only accepts team registrations, but insufficient spots remain for team formation.
+                    </p>
+                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg mb-6">
+                        <div className="flex items-center gap-3">
+                            <Users className="w-5 h-5 text-purple-600" />
+                            <div className="text-left">
+                                <p className="text-purple-800 dark:text-purple-200 text-sm font-medium">Team Registration Only</p>
+                                <p className="text-purple-700 dark:text-purple-300 text-xs">
+                                    Only {availability.remainingSpots} spots left (need {hackathon.min_team_size} for team formation)
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="space-y-3">
+                        <PremiumButton onClick={() => navigate(`/hackathons/${id}`)} variant="primary">
+                            <Info className="w-4 h-4" />
+                            View Hackathon Details
+                        </PremiumButton>
+                        <PremiumButton onClick={() => navigate('/hackathons')} variant="outline">
+                            <ArrowLeft className="w-4 h-4" />
+                            Browse Other Hackathons
+                        </PremiumButton>
+                    </div>
+                </HeroCard>
+            </div>
+        );
+    }
+
+    // Check if registration type is both but neither individual nor team registration is available
+    if (hackathon.registration_type === 'both' && !availability.canRegisterIndividual && !availability.canRegisterTeam) {
+        return (
+            <div className={`${theme === 'dark' ? 'dark' : ''} min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 dark:from-gray-900 dark:via-gray-800 dark:to-red-900/20 flex items-center justify-center px-4`}>
+                <HeroCard className="max-w-lg text-center p-8">
+                    <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <AlertTriangle className="w-10 h-10 text-red-600 dark:text-red-400" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Registration Unavailable</h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">
+                        Neither individual nor team registration is currently available for this hackathon.
+                    </p>
+
+                    {/* Show both registration types and their status */}
+                    <div className="space-y-4 mb-6">
+                        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                            <div className="flex items-center gap-3">
+                                <User className="w-5 h-5 text-gray-500" />
+                                <div className="text-left flex-1">
+                                    <p className="text-gray-700 dark:text-gray-300 text-sm font-medium">Individual Registration</p>
+                                    <p className="text-gray-500 dark:text-gray-500 text-xs">No individual spots available</p>
+                                </div>
+                                <X className="w-4 h-4 text-red-500" />
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                            <div className="flex items-center gap-3">
+                                <Users className="w-5 h-5 text-gray-500" />
+                                <div className="text-left flex-1">
+                                    <p className="text-gray-700 dark:text-gray-300 text-sm font-medium">Team Registration</p>
+                                    <p className="text-gray-500 dark:text-gray-500 text-xs">
+                                        Only {availability.remainingSpots} spots left (need {hackathon.min_team_size} minimum)
+                                    </p>
+                                </div>
+                                <X className="w-4 h-4 text-red-500" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg mb-6">
+                        <p className="text-red-800 dark:text-red-200 text-sm">
+                            🚫 Registration capacity issue: {availability.remainingSpots} spots remaining out of {hackathon.max_participants}
+                        </p>
+                    </div>
+
+                    <div className="space-y-3">
+                        <PremiumButton onClick={() => navigate(`/hackathons/${id}`)} variant="primary">
+                            <Info className="w-4 h-4" />
+                            View Hackathon Details
+                        </PremiumButton>
+                        <PremiumButton onClick={() => navigate('/hackathons')} variant="outline">
+                            <ArrowLeft className="w-4 h-4" />
+                            Browse Other Hackathons
+                        </PremiumButton>
+                    </div>
+                </HeroCard>
+            </div>
+        );
+    }
+
+    // If registration type is 'both' but only one type is available, show limited availability message
+    if (hackathon.registration_type === 'both' && (!availability.canRegisterIndividual || !availability.canRegisterTeam)) {
+        const availableType = availability.canRegisterIndividual ? 'individual' : 'team';
+        const unavailableType = !availability.canRegisterIndividual ? 'individual' : 'team';
+
+        return (
+            <div className={`${theme === 'dark' ? 'dark' : ''} min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900`}>
+
+                {/* Toast Container */}
+                <div className="fixed inset-0 pointer-events-none z-50">
+                    {toasts.map((toast) => (
+                        <Toast
+                            key={toast.id}
+                            message={toast.message}
+                            type={toast.type}
+                            isVisible={true}
+                            onClose={() => hideToast(toast.id)}
+                            duration={0}
+                            position="top-right"
+                        />
+                    ))}
+                </div>
+
+                <div className="relative">
+                    {/* Hero Header */}
+                    <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 py-16 px-4 sm:px-6 lg:px-8 overflow-hidden">
+                        <div className="absolute inset-0 bg-black/20"></div>
+                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20"></div>
+
+                        <div className="relative max-w-4xl mx-auto">
+                            <motion.button
+                                onClick={() => navigate(`/hackathons/${id}`)}
+                                whileHover={{ scale: 1.05, x: -2 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white/90 hover:text-white hover:bg-white/30 transition-all mb-8"
+                            >
+                                <ArrowLeft className="w-5 h-5" />
+                                <span className="font-medium">Back to Hackathon</span>
+                            </motion.button>
+
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-center"
+                            >
+                                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+                                    Limited Registration
+                                </h1>
+                                <p className="text-xl sm:text-2xl text-indigo-100 mb-4 font-medium">
+                                    {hackathon.title}
+                                </p>
+                                <div className="flex items-center justify-center gap-4 flex-wrap">
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white">
+                                        <Trophy className="w-5 h-5" />
+                                        <span className="font-semibold">₹{hackathon.total_prize_pool || 'TBD'} Prize Pool</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white">
+                                        <Users className="w-5 h-5" />
+                                        <span className="font-semibold">{hackathon.confirmed_participants}/{hackathon.max_participants} Registered</span>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="relative -mt-8 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+                        <HeroCard className="p-8 text-center">
+                            <div className="w-20 h-20 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <AlertTriangle className="w-10 h-10 text-yellow-600 dark:text-yellow-400" />
+                            </div>
+
+                            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                                Limited Registration Options
+                            </h2>
+
+                            <p className="text-gray-600 dark:text-gray-400 mb-8 text-lg">
+                                Due to limited spots, only {availableType} registration is currently available.
+                            </p>
+
+                            {/* Show registration status */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                {/* Available Registration Type */}
+                                <div className={`p-6 rounded-2xl border-2 ${availableType === 'individual'
+                                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                                    : 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                                    }`}>
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-3 rounded-xl ${availableType === 'individual'
+                                            ? 'bg-green-500 text-white'
+                                            : 'bg-green-500 text-white'
+                                            }`}>
+                                            {availableType === 'individual' ? <User className="w-6 h-6" /> : <Users className="w-6 h-6" />}
+                                        </div>
+                                        <div className="text-left">
+                                            <h3 className="font-bold text-lg text-green-900 dark:text-green-100 capitalize">
+                                                {availableType} Registration
+                                            </h3>
+                                            <p className="text-green-700 dark:text-green-300 text-sm">
+                                                ✅ Available for registration
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Unavailable Registration Type */}
+                                <div className="p-6 rounded-2xl border-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 opacity-75">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 rounded-xl bg-gray-300 dark:bg-gray-600 text-gray-500">
+                                            {unavailableType === 'individual' ? <User className="w-6 h-6" /> : <Users className="w-6 h-6" />}
+                                        </div>
+                                        <div className="text-left">
+                                            <h3 className="font-bold text-lg text-gray-500 dark:text-gray-400 capitalize">
+                                                {unavailableType} Registration
+                                            </h3>
+                                            <p className="text-gray-500 dark:text-gray-500 text-sm">
+                                                ❌ {unavailableType === 'individual'
+                                                    ? 'No individual spots available'
+                                                    : `Need ${hackathon.min_team_size} spots for team (${availability.remainingSpots} left)`}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Continue to Registration Button */}
+                            <div className="space-y-4">
+                                <PremiumButton
+                                    onClick={() => {
+                                        // Continue to registration form with the available type pre-selected
+                                        showInfo(`Continuing with ${availableType} registration`);
+                                        // The form will render normally with the type restrictions
+                                    }}
+                                    variant="primary"
+                                    className="w-full sm:w-auto"
+                                >
+                                    <CheckCircle className="w-4 h-4" />
+                                    Continue with {availableType.charAt(0).toUpperCase() + availableType.slice(1)} Registration
+                                </PremiumButton>
+
+                                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                                    <PremiumButton onClick={() => navigate(`/hackathons/${id}`)} variant="outline">
+                                        <Info className="w-4 h-4" />
+                                        View Hackathon Details
+                                    </PremiumButton>
+                                    <PremiumButton onClick={() => navigate('/hackathons')} variant="outline">
+                                        <ArrowLeft className="w-4 h-4" />
+                                        Browse Other Hackathons
+                                    </PremiumButton>
+                                </div>
+                            </div>
+                        </HeroCard>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
 
     return (
         <div className={`${theme === 'dark' ? 'dark' : ''} min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900`}>
@@ -1051,7 +1506,7 @@ const HackathonRegister = () => {
                             className="text-center"
                         >
                             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-                                Join the Challenge
+                                {userApplication && !showEditForm ? 'Your Application' : 'Join the Challenge'}
                             </h1>
                             <p className="text-xl sm:text-2xl text-indigo-100 mb-4 font-medium">
                                 {hackathon.title}
@@ -1069,7 +1524,7 @@ const HackathonRegister = () => {
                                 </div>
                                 <div className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white">
                                     <Users className="w-5 h-5" />
-                                    <span className="font-semibold">{hackathon.confirmed_participants}/{hackathon.max_participants} Confirmed</span>
+                                    <span className="font-semibold">{hackathon.confirmed_participants}/{hackathon.max_participants} Registered</span>
                                 </div>
                             </div>
                         </motion.div>
@@ -1078,22 +1533,26 @@ const HackathonRegister = () => {
 
                 {/* Main Content */}
                 <div className="relative -mt-8 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-                    {userApplication ? (
+                    {userApplication && !showEditForm ? (
                         <ApplicationStatusCard
                             application={userApplication}
                             hackathon={hackathon}
+                            onEdit={() => setShowEditForm(true)}
                             onMakePayment={handleMakePayment}
                             makingPayment={makingPayment}
                         />
                     ) : (
                         <>
-                            <div className="mb-12">
-                                <ProgressIndicator
-                                    currentStep={step}
-                                    totalSteps={2}
-                                    stepLabels={stepLabels}
-                                />
-                            </div>
+
+                            {!userApplication && (
+                                <div className="mb-12">
+                                    <ProgressIndicator
+                                        currentStep={step}
+                                        totalSteps={2}
+                                        stepLabels={stepLabels}
+                                    />
+                                </div>
+                            )}
 
                             <AnimatePresence mode="wait">
                                 {step === 0 ? (
@@ -1109,43 +1568,107 @@ const HackathonRegister = () => {
                                                     Registration Details
                                                 </h2>
                                                 <p className="text-gray-600 dark:text-gray-400 text-lg">
-                                                    Tell us about yourself and your interests
+                                                    Tell us how you want to participate
                                                 </p>
                                             </div>
 
-                                            {/* Registration Type Info */}
-                                            <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
-                                                <div className="flex items-center gap-4">
-                                                    {hackathon.registration_type === 'individual' ? (
-                                                        <>
-                                                            <User className="w-8 h-8 text-blue-600" />
-                                                            <div>
-                                                                <h3 className="font-bold text-blue-900 dark:text-blue-100">Individual Only Hackathon</h3>
-                                                                <p className="text-blue-700 dark:text-blue-300">This hackathon is for individual participants only. No team formation.</p>
-                                                            </div>
-                                                        </>
-                                                    ) : hackathon.registration_type === 'team' ? (
-                                                        <>
-                                                            <Users className="w-8 h-8 text-blue-600" />
-                                                            <div>
-                                                                <h3 className="font-bold text-blue-900 dark:text-blue-100">Team Only Hackathon</h3>
-                                                                <p className="text-blue-700 dark:text-blue-300">Everyone registers individually. Team formation is required after confirmation.</p>
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <User className="w-8 h-8 text-blue-600" />
-                                                            <div>
-                                                                <h3 className="font-bold text-blue-900 dark:text-blue-100">Individual Registration</h3>
-                                                                <p className="text-blue-700 dark:text-blue-300">Everyone registers individually. Team formation is optional after confirmation.</p>
-                                                            </div>
-                                                        </>
+                                            {/* Registration Type Selection */}
+                                            {/* Update the RegistrationTypeCard usage in the main form */}
+                                            {individualAllowed && teamAllowed && (
+                                                <div className="space-y-4">
+                                                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                                                        Choose Your Path
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                        <RegistrationTypeCard
+                                                            type="individual"
+                                                            icon={User}
+                                                            title="Solo Journey"
+                                                            description={availability.canRegisterIndividual
+                                                                ? "Register as an individual and showcase your skills independently"
+                                                                : `No individual spots available (${availability.remainingSpots} left)`
+                                                            }
+                                                            selected={regType === 'individual'}
+                                                            onClick={() => {
+                                                                if (availability.canRegisterIndividual) {
+                                                                    setRegType('individual');
+                                                                    showInfo('Individual registration selected');
+                                                                } else {
+                                                                    showError('No spots left for individual registration');
+                                                                }
+                                                            }}
+                                                            color="indigo"
+                                                            disabled={!availability.canRegisterIndividual} // ✅ Add disabled prop
+                                                        />
+                                                        <RegistrationTypeCard
+                                                            type="team"
+                                                            icon={Users}
+                                                            title="Team Leader"
+                                                            description={availability.canRegisterTeam
+                                                                ? "Lead a team and collaborate to build something amazing together"
+                                                                : `Need ${hackathon.min_team_size} spots for team registration (${availability.remainingSpots} left)`
+                                                            }
+                                                            selected={regType === 'team'}
+                                                            onClick={() => {
+                                                                if (availability.canRegisterTeam) {
+                                                                    setRegType('team');
+                                                                    showInfo('Team leader registration selected');
+                                                                } else {
+                                                                    showError('Not enough spots left for team formation');
+                                                                }
+                                                            }}
+                                                            color="purple"
+                                                            disabled={!availability.canRegisterTeam} // ✅ Add disabled prop
+                                                        />
+                                                    </div>
+
+                                                    {/* Warning when team registration is disabled */}
+                                                    {!availability.canRegisterTeam && availability.canRegisterIndividual && (
+                                                        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl">
+                                                            <p className="text-yellow-800 dark:text-yellow-200 text-sm">
+                                                                ⚠️ Team registration disabled: Only {availability.remainingSpots} spots remaining (need {hackathon.min_team_size} for team formation)
+                                                            </p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* When hackathon is completely full */}
+                                                    {!availability.canRegisterIndividual && !availability.canRegisterTeam && (
+                                                        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                                                            <p className="text-red-800 dark:text-red-200 text-sm">
+                                                                🚫 Registration full: No spots remaining ({hackathon.confirmed_participants}/{hackathon.max_participants})
+                                                            </p>
+                                                        </div>
                                                     )}
                                                 </div>
-                                            </div>
+                                            )}
 
-                                            {/* Team Interest Option - Only show if registration_type is 'both' */}
-                                            {shouldShowTeamOption() && (
+
+                                            {/* Single type info */}
+                                            {!individualAllowed && (
+                                                <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+                                                    <div className="flex items-center gap-4">
+                                                        <Users className="w-8 h-8 text-blue-600" />
+                                                        <div>
+                                                            <h3 className="font-bold text-blue-900 dark:text-blue-100">Team Registration Only</h3>
+                                                            <p className="text-blue-700 dark:text-blue-300">This hackathon accepts team registrations only</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {!teamAllowed && (
+                                                <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+                                                    <div className="flex items-center gap-4">
+                                                        <User className="w-8 h-8 text-blue-600" />
+                                                        <div>
+                                                            <h3 className="font-bold text-blue-900 dark:text-blue-100">Individual Registration Only</h3>
+                                                            <p className="text-blue-700 dark:text-blue-300">This hackathon accepts individual registrations only</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Individual Options */}
+                                            {regType === 'individual' && individualAllowed && (
                                                 <motion.div
                                                     initial={{ opacity: 0, y: 20 }}
                                                     animate={{ opacity: 1, y: 0 }}
@@ -1157,15 +1680,48 @@ const HackathonRegister = () => {
                                                             checked={lookingTeam}
                                                             onChange={() => {
                                                                 setLookingTeam(!lookingTeam);
-                                                                showInfo(!lookingTeam ? 'Marked as interested in team collaboration' : 'Removed team collaboration preference');
+                                                                showInfo(!lookingTeam ? 'Marked as looking for team' : 'Removed team seeking preference');
                                                             }}
                                                             className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
                                                         />
                                                         <div>
-                                                            <span className="font-semibold text-gray-900 dark:text-white">Interested in team collaboration?</span>
-                                                            <p className="text-sm text-gray-600 dark:text-gray-400">We'll help you find and connect with other participants for team formation</p>
+                                                            <span className="font-semibold text-gray-900 dark:text-white">Looking for a team?</span>
+                                                            <p className="text-sm text-gray-600 dark:text-gray-400">We'll help match you with other participants</p>
                                                         </div>
                                                     </label>
+                                                </motion.div>
+                                            )}
+
+                                            {/* Team Options */}
+                                            {regType === 'team' && teamAllowed && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className="space-y-4"
+                                                >
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                                            Preferred Team Size
+                                                        </label>
+                                                        <select
+                                                            value={prefTeamSize}
+                                                            onChange={(e) => {
+                                                                setPrefTeamSize(Number(e.target.value));
+                                                                showInfo(`Team size set to ${e.target.value} members`);
+                                                            }}
+                                                            className="w-full px-4 py-3 bg-white/80 dark:bg-gray-800/80 border-2 border-gray-200 dark:border-gray-600 
+                                         rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500 
+                                         dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                                                        >
+                                                            {Array.from(
+                                                                { length: hackathon.max_team_size - hackathon.min_team_size + 1 },
+                                                                (_, i) => hackathon.min_team_size + i
+                                                            ).map(size => (
+                                                                <option key={size} value={size}>{size} members</option>
+                                                            ))}
+                                                        </select>
+                                                        {errors.teamSize && <p className="text-red-500 text-sm mt-1">{errors.teamSize}</p>}
+                                                    </div>
                                                 </motion.div>
                                             )}
 
@@ -1188,11 +1744,16 @@ const HackathonRegister = () => {
                                                 {errors.skills && <p className="text-red-500 text-sm mt-2">{errors.skills}</p>}
                                             </div>
 
+                                            {/* In the step 0 continue button */}
                                             <div className="flex justify-end pt-6">
                                                 <PremiumButton
                                                     onClick={handleNextStep}
                                                     variant="primary"
-                                                    disabled={skills.length === 0}
+                                                    disabled={
+                                                        skills.length === 0 || // ✅ Disable if no skills
+                                                        (regType === 'team' && !availability.canRegisterTeam) || // ✅ Disable if team selected but can't register team
+                                                        (regType === 'individual' && !availability.canRegisterIndividual) // ✅ Disable if individual selected but can't register individual
+                                                    }
                                                 >
                                                     Continue
                                                     <ChevronRight className="w-4 h-4" />
@@ -1276,7 +1837,13 @@ const HackathonRegister = () => {
                                                     onClick={handleSubmit}
                                                     loading={submitting}
                                                     variant="secondary"
-                                                    disabled={submitting || isOrganizer}
+                                                    disabled={
+                                                        submitting ||
+                                                        isOrganizer ||
+                                                        !availability.canRegisterIndividual && !availability.canRegisterTeam || // ✅ Disable if no spots available
+                                                        (regType === 'team' && !availability.canRegisterTeam) || // ✅ Disable if team selected but can't register team
+                                                        (regType === 'individual' && !availability.canRegisterIndividual) // ✅ Disable if individual selected but can't register individual
+                                                    }
                                                 >
                                                     {submitting ? (
                                                         'Submitting...'

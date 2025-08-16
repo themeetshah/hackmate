@@ -104,6 +104,27 @@ class Hackathon(models.Model):
     def get_absolute_url(self):
         return reverse('hackathons:detail', kwargs={'id': self.id})
     
+    def update_status_based_on_dates(self):
+        """Auto-update status based on current time and dates"""
+        now = timezone.now()
+        
+        if now < self.registration_start:
+            if self.status == 'published':
+                return  # Keep as published until registration opens
+        elif self.registration_start <= now <= self.registration_end:
+            if self.confirmed_participants < self.max_participants:
+                self.status = 'registration_open'
+            else:
+                self.status = 'registration_closed'
+        elif now > self.registration_end and now < self.start_date:
+            self.status = 'registration_closed'
+        elif self.start_date <= now <= self.end_date:
+            self.status = 'ongoing'
+        elif now > self.end_date:
+            self.status = 'completed'
+        
+        self.save(update_fields=['status'])
+    
     @property
     def is_registration_open(self):
         now = timezone.now()
@@ -146,6 +167,7 @@ class HackathonApplication(models.Model):
     
     STATUS_CHOICES = [
         ('applied', 'Applied'),           # Initial application
+        ('team_pending', 'Team Pending'), # Team leader registered, waiting for team formation
         ('payment_pending', 'Payment Pending'),  # For paid hackathons
         ('confirmed', 'Confirmed'),       # Payment done + confirmed by organizer
         ('rejected', 'Rejected'),         # Rejected by organizer

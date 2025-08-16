@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import {
   Search, Plus, Calendar, MapPin, Trophy, Users, Clock,
   DollarSign, Globe, Monitor, X, ChevronDown, SlidersHorizontal,
@@ -11,6 +11,7 @@ import HackathonCard from './HackathonCard';
 import { useAuth } from '../../contexts/AuthContext';
 import hackathonServices from '../../api/hackathonServices';
 import userServices from '../../api/userServices';
+import { useToast } from '../../hooks/useToast';
 
 const HackathonList = () => {
   const { user } = useAuth();
@@ -37,6 +38,16 @@ const HackathonList = () => {
   const [hasNext, setHasNext] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
 
+
+  const {
+    toasts,
+    success: showSuccess,
+    error: showError,
+    info: showInfo,
+    warning: showWarning,
+    hideToast
+  } = useToast();
+
   // Real fetch function using updated hackathonServices
   const fetchHackathons = useCallback(async () => {
     setLoading(true);
@@ -58,7 +69,21 @@ const HackathonList = () => {
     }
   }, []);
 
-  // Fix the category filter in filteredHackathons
+  // ✅ FIX: Add fetchUserApplications function
+  const fetchUserApplications = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const response = await hackathonServices.getMyApplications();
+      if (response.success) {
+        setUserApplications(response.data.applications || []);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch user applications:', err);
+    }
+  }, [user]);
+
+  // ✅ FIX: Fixed filteredHackathons with proper return statements and field names
   const filteredHackathons = useMemo(() => {
     let filtered = hackathons;
 
@@ -70,7 +95,7 @@ const HackathonList = () => {
       );
     }
 
-    // Category filter - FIX: Check if categories exist and is array
+    // Category filter - Check if categories exist and is array
     if (selectedCategories.length > 0) {
       filtered = filtered.filter(h =>
         h.categories && Array.isArray(h.categories) &&
@@ -83,9 +108,12 @@ const HackathonList = () => {
       filtered = filtered.filter(h => h.mode === selectedMode);
     }
 
-    // Status filter
+    // ✅ FIX: Status filter with proper return statement
     if (selectedStatus !== 'all') {
-      filtered = filtered.filter(h => h.status === selectedStatus);
+      filtered = filtered.filter(h => {
+        console.log('Filtering status:', h.status, 'against:', selectedStatus);
+        return h.status === selectedStatus;
+      });
     }
 
     // Difficulty filter
@@ -93,7 +121,7 @@ const HackathonList = () => {
       filtered = filtered.filter(h => h.difficulty_level === selectedDifficulty);
     }
 
-    // Sort - FIX: Handle date sorting properly
+    // ✅ FIX: Sorting with proper field names (no escaped underscores)
     filtered.sort((a, b) => {
       let aValue = a[sortBy];
       let bValue = b[sortBy];
@@ -130,7 +158,8 @@ const HackathonList = () => {
     console.log('Selected mode:', selectedMode);
     console.log('Selected status:', selectedStatus);
     console.log('Selected difficulty:', selectedDifficulty);
-  }, [filteredHackathons, searchTerm, selectedCategories, selectedMode, selectedStatus, selectedDifficulty]);
+    console.log('Sample hackathon statuses:', hackathons.slice(0, 3).map(h => h.status));
+  }, [filteredHackathons, searchTerm, selectedCategories, selectedMode, selectedStatus, selectedDifficulty, hackathons]);
 
   // Fetch categories from backend using updated API
   const fetchCategories = useCallback(async () => {
@@ -172,6 +201,11 @@ const HackathonList = () => {
     fetchCategories();
   }, [fetchCategories]);
 
+  // ✅ FIX: Fetch user applications
+  useEffect(() => {
+    fetchUserApplications();
+  }, [fetchUserApplications]);
+
   // Debounced search effect
   useEffect(() => {
     if (searchTerm === '') {
@@ -208,14 +242,18 @@ const HackathonList = () => {
     { value: 'expert', label: 'Expert' }
   ];
 
+  // ✅ FIX: Updated status options to match backend model choices
   const statusOptions = [
     { value: 'all', label: 'All Status' },
+    { value: 'published', label: 'Published' },
     { value: 'registration_open', label: 'Open for Registration' },
+    { value: 'registration_closed', label: 'Registration Closed' },
     { value: 'ongoing', label: 'Live Now' },
-    { value: 'published', label: 'Upcoming' },
-    { value: 'completed', label: 'Completed' }
+    { value: 'completed', label: 'Completed' },
+    { value: 'cancelled', label: 'Cancelled' }
   ];
 
+  // ✅ FIX: Updated sort options with proper field names
   const sortOptions = [
     { value: 'start_date', label: 'Start Date' },
     { value: 'registration_end', label: 'Registration Deadline' },
@@ -232,22 +270,24 @@ const HackathonList = () => {
     }
 
     try {
-      // Navigate to the create page (which now handles both GET and POST)
-      navigate('/hackathons/create');
-
       // Optional: Update role in background if needed
       if (user.role !== 'organizer' && user.role !== 'admin') {
-        userServices.updateProfile({ role: 'organizer' }, true)
+        await userServices.updateProfile({ role: 'organizer' }, true)
           .then(() => {
             console.log('User role updated successfully');
+            window.location.href = '/hackathons/create';
           })
           .catch(error => {
             console.warn('Role update failed:', error);
           });
+      } else {
+        // Already has the right role
+        navigate('/hackathons/create');
       }
+
     } catch (error) {
       console.error('Navigation failed:', error);
-      alert('Failed to navigate to create page. Please try again.');
+      showError('Failed to navigate to create page. Please try again.');
     }
   };
 
@@ -258,10 +298,10 @@ const HackathonList = () => {
       return;
     }
     if (hackathon.organizer === user.id || hackathon.organizer_id === user.id) {
-      alert('You cannot apply to a hackathon you organize!');
+      showWarning('You cannot apply to a hackathon you organize!');
       return;
     }
-    navigate(`${hackathon.id}/register`)
+    navigate(`/hackathons/${hackathon.id}/register`)
   };
 
   // Navigate to hackathon detail page
@@ -311,8 +351,10 @@ const HackathonList = () => {
     setCurrentPage(1);
     setError(null);
     fetchHackathons();
+    fetchUserApplications(); // ✅ Also refresh user applications
   };
 
+  // Rest of your component remains the same...
   if (loading && currentPage === 1 && hackathons.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -323,7 +365,6 @@ const HackathonList = () => {
         >
           <div className="relative">
             <div className="w-20 h-20 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto"></div>
-            {/* <div className="absolute inset-0 w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mt-2 ml-2" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }}></div> */}
           </div>
           <div>
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">Loading Hackathons</h3>
@@ -394,7 +435,7 @@ const HackathonList = () => {
           transition={{ delay: 0.1 }}
           className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl border border-white/20 dark:border-gray-700/50 p-6 mb-8 shadow-xl"
         >
-          <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex flex-col md:flex-row gap-4">
 
             {/* Search */}
             <div className="flex-1 relative">
@@ -648,7 +689,6 @@ const HackathonList = () => {
           ) : (
             <>
               {/* Results Header */}
-              {/* Results Header - Use filteredHackathons.length */}
               <div className="flex items-center justify-between mb-8">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -671,9 +711,8 @@ const HackathonList = () => {
                 </button>
               </div>
 
-
               {/* Hackathon Grid - Use filteredHackathons instead of hackathons */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                 {filteredHackathons.map((hackathon, index) => (
                   <motion.div
                     key={hackathon.id}

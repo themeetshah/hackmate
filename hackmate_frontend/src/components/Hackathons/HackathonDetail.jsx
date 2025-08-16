@@ -503,7 +503,7 @@ END:VCALENDAR`;
     // Prize formatting
     const formatPrize = (amount) => {
         const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-        if (!numAmount || numAmount === 0) return 'TBD';
+        if (!numAmount || numAmount === 0) return 'No Price';
         if (numAmount >= 100000) return `₹${(numAmount / 100000).toFixed(1)}L`;
         if (numAmount >= 1000) return `₹${(numAmount / 1000).toFixed(0)}K`;
         return `₹${numAmount}`;

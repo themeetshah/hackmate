@@ -61,3 +61,17 @@ class HackathonApplicationCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError('This hackathon is full')
                 
         return data
+
+
+# hackathons/serializers.py
+
+class HackathonApplicationUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HackathonApplication
+        fields = ['status', 'payment_status', 'amount_paid', 'payment_id', 'confirmed_at']
+        
+    def validate(self, data):
+        """Validate payment update"""
+        if data.get('status') == 'confirmed' and not data.get('amount_paid'):
+            raise serializers.ValidationError('Amount paid is required for confirmed status')
+        return data

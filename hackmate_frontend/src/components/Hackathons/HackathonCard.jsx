@@ -367,10 +367,9 @@ const HackathonCard = ({
               <ExternalLink className="w-5 h-5 text-gray-600 dark:text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400" />
             </motion.button>
             {/* Apply button logic */}
-            {isOrganizer && (
+            {/* {isOrganizer && (
               <span className="px-6 py-3 rounded-xl border font-semibold bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800 flex items-center gap-2 select-none cursor-default">
                 <Star className="w-5 h-5" />
-                {/* You are the organizer */}
                 Organizer
               </span>
             )}
@@ -415,7 +414,7 @@ const HackathonCard = ({
                   {spotsLeft === 0 ? 'Full' : 'Closed'}
                 </button>
               )
-            )}
+            )} */}
           </div>
         </div>
       </div>
