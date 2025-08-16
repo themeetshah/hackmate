@@ -1,15 +1,15 @@
 /* --------------------------------------------------------------------------
-   HackathonRegister.jsx · REDESIGNED PREMIUM EDITION WITH PAYMENT AND ORGANIZER PROTECTION
-   Professional multi-step registration with enhanced UI/UX, payment logic, and organizer restrictions
+   HackathonRegister.jsx · REDESIGNED PREMIUM EDITION - SIMPLIFIED INDIVIDUAL REGISTRATION
+   Professional registration with individual-only flow and confirmation-based limits
    -------------------------------------------------------------------------- */
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    ArrowLeft, Loader, Users, User, CheckCircle, Sparkles, Plus, X, Globe,
-    Monitor, MapPin, Code2, Trophy, Target, Palette, Shield, Cpu, Database,
-    Brain, Gamepad2, Edit, CreditCard, Calendar, Clock, AlertTriangle, Info,
-    Star, Zap, ChevronRight, ChevronLeft, Award, Briefcase, Heart, Send, Lightbulb
+    ArrowLeft, Loader, Users, User, CheckCircle, Plus, X, Globe,
+    Code2, Trophy, Palette, Shield, Cpu, Database, Brain, Gamepad2,
+    CreditCard, Calendar, Clock, AlertTriangle, Info, Star,
+    ChevronRight, ChevronLeft, Briefcase, Send, Lightbulb
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import hackathonServices from '../../api/hackathonServices';
@@ -40,7 +40,6 @@ const PremiumButton = ({ children, variant = "primary", loading = false, ...prop
         primary: "bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-700 hover:via-purple-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40",
         secondary: "bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 hover:from-emerald-600 hover:via-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40",
         outline: "border-2 border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-indigo-400 dark:hover:border-indigo-500",
-        ghost: "bg-gray-100/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600",
         premium: "bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 hover:from-yellow-500 hover:via-orange-600 hover:to-red-600 text-white shadow-lg shadow-orange-500/30 hover:shadow-xl hover:shadow-orange-500/40",
         warning: "bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40"
     };
@@ -67,31 +66,6 @@ const PremiumButton = ({ children, variant = "primary", loading = false, ...prop
         </motion.button>
     );
 };
-
-const ModernInput = ({ label, icon: Icon, error, ...props }) => (
-    <div className="space-y-2">
-        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
-            {Icon && <Icon className="w-4 h-4 text-indigo-500" />}
-            {label}
-        </label>
-        <motion.div
-            whileFocus={{ scale: 1.01 }}
-            className="relative group"
-        >
-            <input
-                {...props}
-                className={`w-full px-4 py-3 bg-white/80 dark:bg-gray-800/80 border-2 
-                   ${error ? 'border-red-300' : 'border-gray-200 dark:border-gray-600'} 
-                   rounded-xl text-gray-900 dark:text-white placeholder-gray-400 
-                   focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 
-                   focus:ring-2 focus:ring-indigo-500/20 transition-all duration-300
-                   backdrop-blur-sm`}
-            />
-            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-500/5 to-purple-500/5 opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
-        </motion.div>
-        {error && <p className="text-red-500 text-xs font-medium">{error}</p>}
-    </div>
-);
 
 const ModernTextArea = ({ label, icon: Icon, error, ...props }) => (
     <div className="space-y-2">
@@ -121,8 +95,7 @@ const ModernTextArea = ({ label, icon: Icon, error, ...props }) => (
 const PremiumChip = ({ children, active, onClick, deletable, icon: Icon, color = "indigo" }) => {
     const colorVariants = {
         indigo: active ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600',
-        emerald: active ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30' : 'bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600',
-        orange: active ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/30' : 'bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
+        emerald: active ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30' : 'bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
     };
 
     return (
@@ -272,46 +245,8 @@ const ProgressIndicator = ({ currentStep, totalSteps, stepLabels }) => (
     </div>
 );
 
-/* ──────────────────────── Registration Type Cards ────────────────────────── */
-const RegistrationTypeCard = ({ type, icon: Icon, title, description, selected, onClick, color }) => (
-    <motion.button
-        type="button"
-        onClick={onClick}
-        whileHover={{ scale: 1.02, y: -2 }}
-        whileTap={{ scale: 0.98 }}
-        className={`relative p-6 rounded-2xl border-2 transition-all duration-300 text-left w-full
-                ${selected
-                ? `border-${color}-500 bg-${color}-50 dark:bg-${color}-900/20 shadow-lg shadow-${color}-500/20`
-                : 'border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 hover:border-gray-300 dark:hover:border-gray-600'
-            }`}
-    >
-        <div className="flex items-start gap-4">
-            <div className={`p-3 rounded-xl ${selected ? `bg-${color}-500 text-white` : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
-                <Icon className="w-6 h-6" />
-            </div>
-            <div className="flex-1">
-                <h3 className={`font-bold text-lg mb-2 ${selected ? `text-${color}-900 dark:text-${color}-100` : 'text-gray-900 dark:text-white'}`}>
-                    {title}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                    {description}
-                </p>
-            </div>
-        </div>
-        {selected && (
-            <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className={`absolute top-4 right-4 w-6 h-6 bg-${color}-500 rounded-full flex items-center justify-center`}
-            >
-                <CheckCircle className="w-4 h-4 text-white" />
-            </motion.div>
-        )}
-    </motion.button>
-);
-
 /* ──────────────────────── Application Status Card ────────────────────────── */
-const ApplicationStatusCard = ({ application, hackathon, onEdit, onMakePayment, makingPayment = false }) => {
+const ApplicationStatusCard = ({ application, hackathon, onMakePayment, makingPayment = false }) => {
     const getStatusConfig = (status) => {
         const configs = {
             confirmed: { color: 'green', icon: CheckCircle, label: 'Confirmed', bg: 'bg-green-50 dark:bg-green-900/20' },
@@ -353,14 +288,8 @@ const ApplicationStatusCard = ({ application, hackathon, onEdit, onMakePayment, 
                     <div className="p-4 bg-white/50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
                         <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Registration Type</h3>
                         <div className="flex items-center gap-3">
-                            {application.application_type === 'team_leader' ? (
-                                <Users className="w-5 h-5 text-purple-500" />
-                            ) : (
-                                <User className="w-5 h-5 text-indigo-500" />
-                            )}
-                            <span className="font-semibold text-gray-900 dark:text-white capitalize">
-                                {application.application_type.replace('_', ' ')}
-                            </span>
+                            <User className="w-5 h-5 text-indigo-500" />
+                            <span className="font-semibold text-gray-900 dark:text-white">Individual</span>
                         </div>
                     </div>
 
@@ -379,13 +308,6 @@ const ApplicationStatusCard = ({ application, hackathon, onEdit, onMakePayment, 
                 </div>
 
                 <div className="space-y-6">
-                    {application.preferred_team_size && (
-                        <div className="p-4 bg-white/50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Team Size</h3>
-                            <p className="font-semibold text-gray-900 dark:text-white">{application.preferred_team_size} members</p>
-                        </div>
-                    )}
-
                     <div className="flex flex-wrap gap-3">
                         {application.looking_for_team && (
                             <div className="flex items-center gap-2 px-3 py-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
@@ -454,8 +376,8 @@ const ApplicationStatusCard = ({ application, hackathon, onEdit, onMakePayment, 
                 </div>
             )}
 
-            {/* Status-specific messages */}
-            {application.status === 'payment_pending' && (
+            {/* Payment pending section - only if max capacity not reached */}
+            {application.status === 'payment_pending' && application.payment_status === 'pending' && hackathon.confirmed_participants < hackathon.max_participants && (
                 <div className="mt-8 p-6 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 border border-orange-200 dark:border-orange-800 rounded-xl">
                     <div className="flex items-center gap-3 mb-3">
                         <CreditCard className="w-6 h-6 text-orange-600" />
@@ -478,6 +400,21 @@ const ApplicationStatusCard = ({ application, hackathon, onEdit, onMakePayment, 
                 </div>
             )}
 
+            {/* Max capacity reached - no more payments */}
+            {application.status === 'payment_pending' && hackathon.confirmed_participants >= hackathon.max_participants && (
+                <div className="mt-8 p-6 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-800 rounded-xl">
+                    <div className="flex items-center gap-3 mb-3">
+                        <X className="w-6 h-6 text-red-600" />
+                        <h4 className="font-bold text-red-800 dark:text-red-200">Registration Closed</h4>
+                    </div>
+                    <p className="text-red-700 dark:text-red-300">
+                        Unfortunately, the hackathon has reached its maximum capacity of {hackathon.max_participants} confirmed participants.
+                        Your application will be moved to rejected status.
+                    </p>
+                </div>
+            )}
+
+            {/* Confirmed status */}
             {application.status === 'confirmed' && (
                 <div className="mt-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-xl">
                     <div className="flex items-center gap-3 mb-3">
@@ -486,6 +423,22 @@ const ApplicationStatusCard = ({ application, hackathon, onEdit, onMakePayment, 
                     </div>
                     <p className="text-green-700 dark:text-green-300">
                         You're all set for the hackathon. Check your email for further updates and event details.
+                        {application.amount_paid > 0 && (
+                            <><br /><span className="text-sm">Payment of ₹{application.amount_paid} completed successfully.</span></>
+                        )}
+                    </p>
+                </div>
+            )}
+
+            {/* Rejected status */}
+            {application.status === 'rejected' && (
+                <div className="mt-8 p-6 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-800 rounded-xl">
+                    <div className="flex items-center gap-3 mb-3">
+                        <X className="w-6 h-6 text-red-600" />
+                        <h4 className="font-bold text-red-800 dark:text-red-200">Application Rejected</h4>
+                    </div>
+                    <p className="text-red-700 dark:text-red-300">
+                        Unfortunately, your application was not selected. The hackathon reached its capacity limit before your application could be confirmed.
                     </p>
                 </div>
             )}
@@ -515,17 +468,14 @@ const HackathonRegister = () => {
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
     const [userApplication, setUserApplication] = useState(null);
-    const [showEditForm, setShowEditForm] = useState(false);
     const [makingPayment, setMakingPayment] = useState(false);
     const [isOrganizer, setIsOrganizer] = useState(false);
 
-    // Form state - Initialize with proper defaults
+    // Form state - Simplified for individual registration only
     const [step, setStep] = useState(0);
-    const [regType, setRegType] = useState('individual'); // This will be updated based on hackathon constraints
     const [lookingTeam, setLookingTeam] = useState(false);
     const [skills, setSkills] = useState(user?.skills ?? []);
     const [roles, setRoles] = useState([]);
-    const [prefTeamSize, setPrefTeamSize] = useState(2);
     const [remoteCollab, setRemoteCollab] = useState(true);
     const [projectIdeas, setProjectIdeas] = useState('');
 
@@ -534,6 +484,16 @@ const HackathonRegister = () => {
 
     const stepLabels = ['Registration Details', 'Additional Information'];
 
+    // Move success effect outside of return statement
+    useEffect(() => {
+        if (success && success.id) {
+            const timer = setTimeout(() => {
+                navigate(`/hackathons/applications/${success.id}`);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [success, navigate]);
+
     // Data fetching
     useEffect(() => {
         (async () => {
@@ -541,22 +501,6 @@ const HackathonRegister = () => {
                 const { success, data, error } = await hackathonServices.getHackathonById(id);
                 if (success) {
                     setHackathon(data.hackathon);
-                    setPrefTeamSize(data.hackathon.min_team_size);
-
-                    // ✅ FIX: Set proper default registration type based on hackathon constraints
-                    const individualAllowed = ['individual', 'both'].includes(data.hackathon.registration_type);
-                    const teamAllowed = ['team', 'both'].includes(data.hackathon.registration_type);
-
-                    if (!individualAllowed && teamAllowed) {
-                        // Team only hackathon
-                        setRegType('team');
-                        showInfo('This hackathon only accepts team registrations');
-                    } else if (individualAllowed && !teamAllowed) {
-                        // Individual only hackathon
-                        setRegType('individual');
-                        showInfo('This hackathon only accepts individual registrations');
-                    }
-                    // For 'both', keep default 'individual'
 
                     // Check if current user is the organizer
                     if (user) {
@@ -568,7 +512,7 @@ const HackathonRegister = () => {
 
                         if (isCurrentUserOrganizer) {
                             showWarning('You are the organizer of this hackathon and cannot register');
-                            return; // Don't fetch applications if organizer
+                            return;
                         }
 
                         try {
@@ -576,15 +520,8 @@ const HackathonRegister = () => {
                             if (appResponse.success) {
                                 const existingApp = appResponse.data.applications.find(app => app.hackathon === parseInt(id));
                                 if (existingApp) {
-                                    setUserApplication(existingApp);
-                                    setRegType(existingApp.application_type === 'team_leader' ? 'team' : 'individual');
-                                    setLookingTeam(existingApp.looking_for_team || false);
-                                    setSkills(existingApp.skills_bringing || []);
-                                    setRoles(existingApp.preferred_roles || []);
-                                    setPrefTeamSize(existingApp.preferred_team_size || data.hackathon.min_team_size);
-                                    setRemoteCollab(existingApp.open_to_remote_collaboration ?? true);
-                                    setProjectIdeas(existingApp.project_ideas || '');
-                                    showInfo('Found your existing application');
+                                    navigate(`/hackathons/applications/${existingApp.id}`);
+                                    return;
                                 }
                             }
                         } catch (appError) {
@@ -612,12 +549,6 @@ const HackathonRegister = () => {
             if (skills.length === 0) {
                 newErrors.skills = 'Please add at least one skill';
             }
-            if (regType === 'team' && prefTeamSize < hackathon.min_team_size) {
-                newErrors.teamSize = `Team size must be at least ${hackathon.min_team_size} members`;
-            }
-            if (regType === 'team' && prefTeamSize > hackathon.max_team_size) {
-                newErrors.teamSize = `Team size cannot exceed ${hackathon.max_team_size} members`;
-            }
         }
 
         setErrors(newErrors);
@@ -633,6 +564,7 @@ const HackathonRegister = () => {
         }
     };
 
+    // Simplified handleSubmit - everyone registers as individual
     const handleSubmit = async () => {
         if (!user) {
             showError('Please log in to submit your application');
@@ -640,7 +572,6 @@ const HackathonRegister = () => {
             return;
         }
 
-        // Double-check organizer status before submission
         if (isOrganizer) {
             showError('You cannot register for your own hackathon!');
             return;
@@ -655,7 +586,6 @@ const HackathonRegister = () => {
         const registrationStart = new Date(hackathon.registration_start);
         const registrationEnd = new Date(hackathon.registration_end);
 
-        // Check if registration hasn't started yet
         if (now < registrationStart) {
             showError('Registration has not started yet for this hackathon');
             return;
@@ -666,24 +596,18 @@ const HackathonRegister = () => {
             return;
         }
 
-        if (hackathon.confirmed_participants >= hackathon.max_participants) {
-            showError('This hackathon is full. No more registrations accepted.');
-            return;
-        }
-
-        // ✅ FIX: Prepare complete and correct payload
+        // Simplified payload - everyone is individual
         const payload = {
             hackathon: parseInt(id),
-            application_type: regType === 'team' ? 'team_leader' : 'individual',
+            application_type: 'individual',
             skills_bringing: skills,
-            looking_for_team: regType === 'individual' ? lookingTeam : false,
-            preferred_team_size: regType === 'team' ? prefTeamSize : null,
+            looking_for_team: lookingTeam,
             preferred_roles: roles,
             open_to_remote_collaboration: remoteCollab,
             project_ideas: projectIdeas || '',
         };
 
-        console.log('Submitting payload:', payload); // Debug log
+        console.log('Submitting payload:', payload);
 
         setSubmitting(true);
         showInfo('Submitting your application...');
@@ -697,46 +621,26 @@ const HackathonRegister = () => {
 
                 if (application.status === 'confirmed') {
                     showSuccess('🎉 Registration confirmed! You\'re all set for the hackathon!');
-
-                    // Update confirmed participants count in the hackathon object
-                    setHackathon(prev => ({
-                        ...prev,
-                        confirmed_participants: prev.confirmed_participants + 1
-                    }));
-
-                    if (regType === 'individual' && !lookingTeam) {
-                        setTimeout(() => {
-                            showInfo('You\'re registered as a solo participant. Good luck with your project!');
-                        }, 2000);
-                    }
                 } else if (application.status === 'applied') {
-                    showSuccess('Application submitted successfully! We\'ll help you find the perfect team match.');
-
-                    if (regType === 'team') {
+                    showSuccess('Application submitted successfully! You will be notified about confirmation.');
+                } else if (application.status === 'payment_pending') {
+                    if (hackathon.confirmed_participants >= hackathon.max_participants) {
+                        showWarning('Hackathon is full. Payment not required. Your application will be rejected.');
+                    } else {
+                        showSuccess('Application submitted! Please complete payment to confirm your participation.');
                         setTimeout(() => {
-                            showInfo('As team leader, you can start inviting members once your application is processed.');
-                        }, 2000);
-                    } else if (lookingTeam) {
-                        setTimeout(() => {
-                            showInfo('We\'ll match you with teams looking for your skills!');
+                            showWarning(`Payment of ₹${hackathon.registration_fee} required to confirm registration`);
                         }, 2000);
                     }
-                } else if (application.status === 'payment_pending') {
-                    showSuccess('Application submitted! Please complete payment to confirm your participation.');
-                    setTimeout(() => {
-                        showWarning(`Payment of ₹${hackathon.registration_fee} required to confirm registration`);
-                    }, 2000);
                 }
 
             } else {
                 if (error.includes('Already applied')) {
                     showError('You have already applied to this hackathon');
                     window.location.reload();
-                } else if (error.includes('full') || error.includes('capacity')) {
-                    showError('This hackathon is full. Try joining the waitlist!');
                 } else if (error.includes('Organizers cannot apply')) {
                     showError('You cannot apply to your own hackathon!');
-                    setIsOrganizer(true); // Update state to show organizer message
+                    setIsOrganizer(true);
                 } else {
                     showError(error || 'Failed to submit application. Please try again.');
                 }
@@ -749,66 +653,43 @@ const HackathonRegister = () => {
         }
     };
 
-    // ✅ FIX: Real payment processing with backend integration
+    // Simplified payment handler
     const handleMakePayment = async () => {
         if (!userApplication || userApplication.status !== 'payment_pending') return;
+
+        // Check if hackathon is still accepting confirmations
+        if (hackathon.confirmed_participants >= hackathon.max_participants) {
+            showError('Sorry, the hackathon has reached its maximum capacity. Payment is no longer accepted.');
+            return;
+        }
 
         setMakingPayment(true);
         showInfo('Processing payment...');
 
         try {
-            // Create payment payload
-            const paymentPayload = {
-                application_id: userApplication.id,
-                amount: hackathon.registration_fee,
-                payment_method: 'card', // This would come from payment form
-                hackathon_id: parseInt(id)
-            };
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
-            console.log('Processing payment with payload:', paymentPayload);
-
-            // Simulate payment processing delay (replace with actual payment API call)
-            await new Promise(resolve => setTimeout(resolve, 3000));
-
-            // ✅ TODO: Replace this simulation with actual payment API call
-            // const paymentResponse = await hackathonServices.processPayment(paymentPayload);
-            // For now, simulate successful payment
-
-            // Update application status via backend
-            const updatePayload = {
-                status: 'confirmed',
-                payment_status: 'completed',
+            const paymentData = {
                 amount_paid: hackathon.registration_fee,
-                payment_id: `payment_${Date.now()}`, // This would come from payment gateway
+                payment_id: `payment_${Date.now()}`,
             };
 
-            // ✅ TODO: Add API endpoint to update application status after payment
-            // const updateResponse = await hackathonServices.updateApplicationPayment(userApplication.id, updatePayload);
+            const { success, data, error } = await hackathonServices.updateApplicationPayment(
+                userApplication.id,
+                paymentData
+            );
 
-            // For simulation, update local state
-            const updatedApplication = {
-                ...userApplication,
-                status: 'confirmed',
-                payment_status: 'completed',
-                amount_paid: hackathon.registration_fee,
-                confirmed_at: new Date().toISOString()
-            };
-            setUserApplication(updatedApplication);
-
-            // Update hackathon confirmed participants
-            setHackathon(prev => ({
-                ...prev,
-                confirmed_participants: prev.confirmed_participants + 1
-            }));
-
-            showSuccess('🎉 Payment successful! Your registration is now confirmed!');
-            setTimeout(() => {
-                showInfo('Welcome to the hackathon! Check your email for further details.');
-            }, 2000);
+            if (success) {
+                setUserApplication(data.application);
+                setHackathon(prev => ({ ...prev, confirmed_participants: prev.confirmed_participants + 1 }));
+                showSuccess('🎉 Payment confirmed! Your registration is now complete!');
+            } else {
+                showError(error || 'Payment update failed');
+            }
 
         } catch (err) {
-            console.error('Payment processing error:', err);
-            showError('Payment failed. Please try again or contact support.');
+            console.error('Payment confirmation error:', err);
+            showError('Payment confirmation failed. Please try again.');
         } finally {
             setMakingPayment(false);
         }
@@ -947,8 +828,8 @@ const HackathonRegister = () => {
         );
     }
 
-    /* Success State */
-    if (success && !showEditForm) {
+    // Success state
+    if (success) {
         return (
             <div className={`${theme === 'dark' ? 'dark' : ''} min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900/20 flex items-center justify-center px-4`}>
                 <HeroCard className="max-w-lg text-center p-8">
@@ -979,43 +860,46 @@ const HackathonRegister = () => {
                                         {success.status.replace('_', ' ')}
                                     </span>
                                 </p>
-                                {success.status === 'confirmed' && hackathon.is_free && (
+
+                                {success.status === 'confirmed' && (
                                     <div className="flex items-center justify-center gap-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
                                         <Star className="w-5 h-5 text-green-600" />
                                         <span className="text-green-800 dark:text-green-200 font-semibold">
-                                            {regType === 'individual' && !lookingTeam ? 'Solo Registration Complete!' : 'Free Event - You\'re all set!'}
+                                            Registration Complete!
                                         </span>
                                     </div>
                                 )}
+
+                                {success.status === 'applied' && (
+                                    <div className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                                        <Clock className="w-5 h-5 text-blue-600" />
+                                        <span className="text-blue-800 dark:text-blue-200 font-semibold">
+                                            Under Review - You will be notified about confirmation
+                                        </span>
+                                    </div>
+                                )}
+
                                 {success.status === 'payment_pending' && (
                                     <div className="flex items-center justify-center gap-2 px-4 py-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
                                         <CreditCard className="w-5 h-5 text-orange-600" />
-                                        <span className="text-orange-800 dark:text-orange-200 font-semibold">Payment Required: ₹{hackathon.registration_fee}</span>
-                                    </div>
-                                )}
-                                {success.status === 'applied' && (
-                                    <div className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                                        <Users className="w-5 h-5 text-blue-600" />
-                                        <span className="text-blue-800 dark:text-blue-200 font-semibold">
-                                            {lookingTeam ? 'Team matching in progress!' : 'Team formation pending!'}
+                                        <span className="text-orange-800 dark:text-orange-200 font-semibold">
+                                            {hackathon.confirmed_participants >= hackathon.max_participants
+                                                ? 'Hackathon Full - No Payment Required'
+                                                : `Payment Required: ₹${hackathon.registration_fee}`}
                                         </span>
                                     </div>
                                 )}
                             </div>
                         </div>
-                        <PremiumButton onClick={() => navigate(`/hackathons/${id}`)} variant="primary">
+                        {/* <PremiumButton onClick={() => navigate(`/hackathons/${id}`)} variant="primary">
                             <ArrowLeft className="w-4 h-4" />
                             Back to Hackathon
-                        </PremiumButton>
+                        </PremiumButton> */}
                     </motion.div>
                 </HeroCard>
             </div>
         );
     }
-
-    const shouldShowForm = !userApplication || showEditForm;
-    const individualAllowed = ['individual', 'both'].includes(hackathon.registration_type);
-    const teamAllowed = ['team', 'both'].includes(hackathon.registration_type);
 
     return (
         <div className={`${theme === 'dark' ? 'dark' : ''} min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900`}>
@@ -1058,7 +942,7 @@ const HackathonRegister = () => {
                             className="text-center"
                         >
                             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-                                {userApplication && !showEditForm ? 'Your Application' : 'Join the Challenge'}
+                                Join the Challenge
                             </h1>
                             <p className="text-xl sm:text-2xl text-indigo-100 mb-4 font-medium">
                                 {hackathon.title}
@@ -1076,7 +960,7 @@ const HackathonRegister = () => {
                                 </div>
                                 <div className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white">
                                     <Users className="w-5 h-5" />
-                                    <span className="font-semibold">{hackathon.confirmed_participants}/{hackathon.max_participants} Registered</span>
+                                    <span className="font-semibold">{hackathon.confirmed_participants}/{hackathon.max_participants} Confirmed</span>
                                 </div>
                             </div>
                         </motion.div>
@@ -1085,25 +969,22 @@ const HackathonRegister = () => {
 
                 {/* Main Content */}
                 <div className="relative -mt-8 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-                    {userApplication && !showEditForm ? (
+                    {userApplication ? (
                         <ApplicationStatusCard
                             application={userApplication}
                             hackathon={hackathon}
-                            onEdit={() => setShowEditForm(true)}
                             onMakePayment={handleMakePayment}
                             makingPayment={makingPayment}
                         />
                     ) : (
                         <>
-                            {!userApplication && (
-                                <div className="mb-12">
-                                    <ProgressIndicator
-                                        currentStep={step}
-                                        totalSteps={2}
-                                        stepLabels={stepLabels}
-                                    />
-                                </div>
-                            )}
+                            <div className="mb-12">
+                                <ProgressIndicator
+                                    currentStep={step}
+                                    totalSteps={2}
+                                    stepLabels={stepLabels}
+                                />
+                            </div>
 
                             <AnimatePresence mode="wait">
                                 {step === 0 ? (
@@ -1119,126 +1000,43 @@ const HackathonRegister = () => {
                                                     Registration Details
                                                 </h2>
                                                 <p className="text-gray-600 dark:text-gray-400 text-lg">
-                                                    Tell us how you want to participate
+                                                    Tell us about yourself and your interests
                                                 </p>
                                             </div>
 
-                                            {/* Registration Type Selection */}
-                                            {individualAllowed && teamAllowed && (
-                                                <div className="space-y-4">
-                                                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                                                        Choose Your Path
-                                                    </h3>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                        <RegistrationTypeCard
-                                                            type="individual"
-                                                            icon={User}
-                                                            title="Solo Journey"
-                                                            description="Register as an individual and showcase your skills independently"
-                                                            selected={regType === 'individual'}
-                                                            onClick={() => {
-                                                                setRegType('individual');
-                                                                showInfo('Individual registration selected');
-                                                            }}
-                                                            color="indigo"
-                                                        />
-                                                        <RegistrationTypeCard
-                                                            type="team"
-                                                            icon={Users}
-                                                            title="Team Leader"
-                                                            description="Lead a team and collaborate to build something amazing together"
-                                                            selected={regType === 'team'}
-                                                            onClick={() => {
-                                                                setRegType('team');
-                                                                showInfo('Team leader registration selected');
-                                                            }}
-                                                            color="purple"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Single type info */}
-                                            {!individualAllowed && (
-                                                <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
-                                                    <div className="flex items-center gap-4">
-                                                        <Users className="w-8 h-8 text-blue-600" />
-                                                        <div>
-                                                            <h3 className="font-bold text-blue-900 dark:text-blue-100">Team Registration Only</h3>
-                                                            <p className="text-blue-700 dark:text-blue-300">This hackathon accepts team registrations only</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {!teamAllowed && (
-                                                <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
-                                                    <div className="flex items-center gap-4">
-                                                        <User className="w-8 h-8 text-blue-600" />
-                                                        <div>
-                                                            <h3 className="font-bold text-blue-900 dark:text-blue-100">Individual Registration Only</h3>
-                                                            <p className="text-blue-700 dark:text-blue-300">This hackathon accepts individual registrations only</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Individual Options */}
-                                            {regType === 'individual' && individualAllowed && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, y: 20 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    className="p-6 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-700"
-                                                >
-                                                    <label className="flex items-center gap-4 cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={lookingTeam}
-                                                            onChange={() => {
-                                                                setLookingTeam(!lookingTeam);
-                                                                showInfo(!lookingTeam ? 'Marked as looking for team' : 'Removed team seeking preference');
-                                                            }}
-                                                            className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
-                                                        />
-                                                        <div>
-                                                            <span className="font-semibold text-gray-900 dark:text-white">Looking for a team?</span>
-                                                            <p className="text-sm text-gray-600 dark:text-gray-400">We'll help match you with other participants</p>
-                                                        </div>
-                                                    </label>
-                                                </motion.div>
-                                            )}
-
-                                            {/* Team Options */}
-                                            {regType === 'team' && teamAllowed && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, y: 20 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    className="space-y-4"
-                                                >
+                                            {/* Registration Info */}
+                                            <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+                                                <div className="flex items-center gap-4">
+                                                    <User className="w-8 h-8 text-blue-600" />
                                                     <div>
-                                                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                                            Preferred Team Size
-                                                        </label>
-                                                        <select
-                                                            value={prefTeamSize}
-                                                            onChange={(e) => {
-                                                                setPrefTeamSize(Number(e.target.value));
-                                                                showInfo(`Team size set to ${e.target.value} members`);
-                                                            }}
-                                                            className="w-full px-4 py-3 bg-white/80 dark:bg-gray-800/80 border-2 border-gray-200 dark:border-gray-600 
-                                         rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500 
-                                         dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                                                        >
-                                                            {Array.from(
-                                                                { length: hackathon.max_team_size - hackathon.min_team_size + 1 },
-                                                                (_, i) => hackathon.min_team_size + i
-                                                            ).map(size => (
-                                                                <option key={size} value={size}>{size} members</option>
-                                                            ))}
-                                                        </select>
-                                                        {errors.teamSize && <p className="text-red-500 text-sm mt-1">{errors.teamSize}</p>}
+                                                        <h3 className="font-bold text-blue-900 dark:text-blue-100">Individual Registration</h3>
+                                                        <p className="text-blue-700 dark:text-blue-300">Everyone registers individually. Team formation happens after confirmation.</p>
                                                     </div>
-                                                </motion.div>
-                                            )}
+                                                </div>
+                                            </div>
+
+                                            {/* Team Interest Option */}
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="p-6 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-700"
+                                            >
+                                                <label className="flex items-center gap-4 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={lookingTeam}
+                                                        onChange={() => {
+                                                            setLookingTeam(!lookingTeam);
+                                                            showInfo(!lookingTeam ? 'Marked as interested in team collaboration' : 'Removed team collaboration preference');
+                                                        }}
+                                                        className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
+                                                    />
+                                                    <div>
+                                                        <span className="font-semibold text-gray-900 dark:text-white">Interested in team collaboration?</span>
+                                                        <p className="text-sm text-gray-600 dark:text-gray-400">We'll help you find and connect with other participants for team formation</p>
+                                                    </div>
+                                                </label>
+                                            </motion.div>
 
                                             {/* Skills Section */}
                                             <div>
@@ -1260,7 +1058,11 @@ const HackathonRegister = () => {
                                             </div>
 
                                             <div className="flex justify-end pt-6">
-                                                <PremiumButton onClick={handleNextStep} variant="primary">
+                                                <PremiumButton
+                                                    onClick={handleNextStep}
+                                                    variant="primary"
+                                                    disabled={skills.length === 0}
+                                                >
                                                     Continue
                                                     <ChevronRight className="w-4 h-4" />
                                                 </PremiumButton>
