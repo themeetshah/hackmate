@@ -38,6 +38,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('confirm_password')
+
+        # Set the username to be the email address
+        validated_data['username'] = validated_data.get('email') 
+
         user = User.objects.create_user(**validated_data)
         return user
 
