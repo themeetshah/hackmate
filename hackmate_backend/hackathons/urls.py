@@ -14,4 +14,7 @@ urlpatterns = [
     path('my/applications/', views.my_applications_view, name='my_applications'),  # GET user's applications
     path('my/organized/', views.my_organized_view, name='my_organized'),  # GET user's organized hackathons
     path('api/categories/', views.hackathon_categories_api, name='api_categories'),  # GET categories
+
+    path('matching/user-hackathons/', views.get_user_hackathons, name='user_hackathons'),
+    path('matching/participants/', views.get_hackathon_participants, name='hackathon_participants'),
 ]

@@ -63,8 +63,7 @@ const HackathonCard = ({
 
     // Check if registration is currently open
     const isRegistrationCurrentlyOpen = now >= registrationStart &&
-      now <= registrationEnd &&
-      hackathon.status === 'published';
+      now <= registrationEnd;
 
     if (isRegistrationCurrentlyOpen) return {
       label: 'Open',
@@ -74,7 +73,7 @@ const HackathonCard = ({
     };
 
     // If registration hasn't started yet but hackathon is published
-    if (now < registrationStart && hackathon.status === 'published') return {
+    if (now < registrationStart) return {
       label: 'Upcoming',
       color: 'from-purple-400 to-indigo-500',
       textColor: 'text-purple-600 dark:text-purple-400',
@@ -96,12 +95,12 @@ const HackathonCard = ({
 
   // Check if registration is currently open
   const isRegistrationOpen = now >= registrationStart &&
-    now <= registrationEnd &&
-    hackathon.status === 'published';
+    now <= registrationEnd;
 
   // Check if registration will open soon
-  const isUpcoming = now < registrationStart &&
-    hackathon.status === 'published';
+  const isUpcoming = now < registrationStart;
+
+  const isCompleted = now > endDate
 
   const getModeInfo = () => {
     switch (hackathon.mode) {
@@ -336,10 +335,18 @@ const HackathonCard = ({
               </span>
             </div>
           )}
-          {!isRegistrationOpen && !isUpcoming && (
+          {!isRegistrationOpen && !isUpcoming && !isCompleted && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
               <ListEnd className="w-4 h-4 text-red-500 flex-shrink-0" />
               <span className="text-red-700 dark:text-red-300 text-sm font-medium">
+                Registration closed
+              </span>
+            </div>
+          )}
+          {isCompleted && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800">
+              <ListEnd className="w-4 h-4 dark:text-white flex-shrink-0" />
+              <span className="text-black-700 dark:text-white text-sm font-medium">
                 Registration closed
               </span>
             </div>

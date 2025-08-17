@@ -29,7 +29,7 @@ const HackathonList = () => {
   const [selectedMode, setSelectedMode] = useState('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
-  const [sortBy, setSortBy] = useState('start_date');
+  const [sortBy, setSortBy] = useState('default');
   const [sortOrder, setSortOrder] = useState('asc');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -108,7 +108,7 @@ const HackathonList = () => {
       filtered = filtered.filter(h => h.mode === selectedMode);
     }
 
-    // ✅ FIX: Status filter with proper return statement
+    // Status filter with proper return statement
     if (selectedStatus !== 'all') {
       filtered = filtered.filter(h => {
         console.log('Filtering status:', h.status, 'against:', selectedStatus);
@@ -121,15 +121,40 @@ const HackathonList = () => {
       filtered = filtered.filter(h => h.difficulty_level === selectedDifficulty);
     }
 
-    // ✅ FIX: Sorting with proper field names (no escaped underscores)
+    // Custom sorting with priority for status
     filtered.sort((a, b) => {
+      // Define status priority order
+      const statusPriority = {
+        'registration_open': 1,  // Upcoming (highest priority)
+        'published': 2,          // Also upcoming (same priority as registration_open)
+        'ongoing': 3,            // Currently happening
+        'registration_closed': 4, // Registration closed but not started
+        'completed': 5           // Finished (lowest priority)
+      };
+
+      // If not sorting by a specific field, use default status-based sorting
+      if (!sortBy || sortBy === 'default') {
+        const aPriority = statusPriority[a.status] || 5; // Unknown statuses go to end
+        const bPriority = statusPriority[b.status] || 5;
+
+        if (aPriority !== bPriority) {
+          return aPriority - bPriority; // Lower number = higher priority
+        }
+
+        // If same status priority, sort by start_date (earliest first)
+        const aDate = new Date(a.start_date || '9999-12-31');
+        const bDate = new Date(b.start_date || '9999-12-31');
+        return aDate - bDate;
+      }
+
+      // Custom sorting for user-selected fields
       let aValue = a[sortBy];
       let bValue = b[sortBy];
 
       // Handle date fields
       if (['start_date', 'end_date', 'registration_start', 'registration_end', 'created_at'].includes(sortBy)) {
-        aValue = new Date(aValue);
-        bValue = new Date(bValue);
+        aValue = new Date(aValue || '1970-01-01');
+        bValue = new Date(bValue || '1970-01-01');
       }
 
       // Handle numeric fields
@@ -138,15 +163,22 @@ const HackathonList = () => {
         bValue = parseFloat(bValue) || 0;
       }
 
+      // Handle string fields (case-insensitive)
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
       if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
       } else {
-        return aValue < bValue ? 1 : -1;
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
       }
     });
 
     return filtered;
   }, [hackathons, searchTerm, selectedCategories, selectedMode, selectedStatus, selectedDifficulty, sortBy, sortOrder]);
+
 
   // Add this after the useMemo to debug
   useEffect(() => {

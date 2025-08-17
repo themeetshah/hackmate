@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import {
     ArrowLeft, Loader, Users, User, CheckCircle, Plus, X, Globe,
     Code2, Trophy, CreditCard, Clock, AlertTriangle, Star,
-    XCircle
+    XCircle,
+    Group
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import hackathonServices from '../../api/hackathonServices';
@@ -180,6 +181,7 @@ const ApplicationDetail = () => {
             confirmed: { color: 'green', icon: CheckCircle, label: 'Confirmed', bg: 'bg-green-50 dark:bg-green-900/20' },
             payment_pending: { color: 'orange', icon: CreditCard, label: 'Payment Pending', bg: 'bg-orange-50 dark:bg-orange-900/20' },
             applied: { color: 'blue', icon: Clock, label: 'Under Review', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+            team_pending: { color: 'yellow', icon: Group, label: 'Team Pending', bg: 'bg-yellow-50 dark:bg-yellow-900/20' },
             cancelled: { color: 'gray', icon: XCircle, label: 'Withdrawn', bg: 'bg-gray-50 dark:bg-gray-900/20' },
             rejected: { color: 'red', icon: X, label: 'Rejected', bg: 'bg-red-50 dark:bg-red-900/20' }
         };
@@ -244,7 +246,9 @@ const ApplicationDetail = () => {
     // ✅ Can only withdraw if not confirmed, cancelled, or rejected
     const canWithdraw = application.status !== 'cancelled' &&
         application.status !== 'rejected' &&
-        application.status !== 'confirmed';
+        application.status !== 'confirmed' &&
+        application.payment_status !== 'completed' &&
+        application.payment_status !== 'not_required';
 
     return (
         <div className={`${theme === 'dark' ? 'dark' : ''} min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900`}>
@@ -497,14 +501,14 @@ const ApplicationDetail = () => {
 
                         {/* Action buttons for different statuses */}
                         <div className="mt-8 flex flex-wrap gap-4 justify-center">
-                            {application.status === 'confirmed' && application.application_type === 'team_leader' && (
+                            {(application.status === 'confirmed' || application.status === 'team_pending') && application.application_type === 'team_leader' && (
                                 <PremiumButton onClick={() => navigate('/teams')} variant="secondary">
                                     <Users className="w-4 h-4" />
                                     Manage Team
                                 </PremiumButton>
                             )}
 
-                            {application.status === 'applied' && application.looking_for_team && (
+                            {application.status === 'team_pending' && application.looking_for_team && (
                                 <PremiumButton onClick={() => navigate('/matching')} variant="secondary">
                                     <Users className="w-4 h-4" />
                                     Find Teams

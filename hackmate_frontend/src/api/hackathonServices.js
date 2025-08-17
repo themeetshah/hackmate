@@ -118,6 +118,33 @@ const hackathonServices = {
         } catch (error) {
             return { success: false, error: 'Failed to fetch categories' };
         }
+    },
+
+    async getUserHackathons() {
+        try {
+            const response = await api.get('/hackathons/matching/user-hackathons/');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching user hackathons:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch hackathons'
+            };
+        }
+    },
+
+    // Get participants for a specific hackathon with matching
+    async getHackathonParticipants(data) {
+        try {
+            const response = await api.post('/hackathons/matching/participants/', data);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching hackathon participants:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch participants'
+            };
+        }
     }
 };
 

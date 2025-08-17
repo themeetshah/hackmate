@@ -48,8 +48,8 @@ const TeamsPage = () => {
               whileHover={{ x: 4 }}
               onClick={() => setSelectedTeam(team)}
               className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 ${selectedTeam.id === team.id
-                  ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-md'
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-md'
                 }`}
             >
               <div className="flex items-start justify-between mb-2">
@@ -110,8 +110,8 @@ const TeamsPage = () => {
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors ${activeTab === tab.id
-                          ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                         }`}
                     >
                       <Icon className="w-4 h-4 mr-2" />
