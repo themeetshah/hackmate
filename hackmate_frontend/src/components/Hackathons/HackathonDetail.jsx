@@ -453,6 +453,12 @@ END:VCALENDAR`;
 
     // Calculate status
     const getStatus = () => {
+        console.log(now)
+        console.log(startDate)
+        console.log(endDate)
+        console.log(registrationStart)
+        console.log(registrationEnd)
+
         if (now > endDate) return {
             label: 'Completed',
             color: 'from-gray-400 to-gray-500',
@@ -466,8 +472,7 @@ END:VCALENDAR`;
         };
 
         const isRegistrationCurrentlyOpen = now >= registrationStart &&
-            now <= registrationEnd &&
-            hackathon.status === 'published';
+            now <= registrationEnd;
 
         if (isRegistrationCurrentlyOpen) return {
             label: 'Registration Open',
@@ -475,7 +480,7 @@ END:VCALENDAR`;
             bgColor: 'bg-blue-50 dark:bg-blue-900/20'
         };
 
-        if (now < registrationStart && hackathon.status === 'published') return {
+        if (now < registrationStart) return {
             label: 'Upcoming',
             color: 'from-purple-400 to-indigo-500',
             bgColor: 'bg-purple-50 dark:bg-purple-900/20'
@@ -495,10 +500,9 @@ END:VCALENDAR`;
 
     const isRegistrationOpen = now >= registrationStart &&
         now <= registrationEnd &&
-        hackathon.status === 'published' &&
         spotsLeft > 0;
 
-    const isUpcoming = now < registrationStart && hackathon.status === 'published';
+    const isUpcoming = now < registrationStart;
 
     // Prize formatting
     const formatPrize = (amount) => {
@@ -1019,6 +1023,8 @@ END:VCALENDAR`;
                                 </motion.div>
                             ) : (
                                 <div className="space-y-3 sm:space-y-4">
+                                    {console.log(isRegistrationOpen)}
+                                    {console.log(isApplying)}
                                     {isRegistrationOpen && spotsLeft > 0 ? (
                                         <motion.button
                                             whileHover={{ scale: 1.02, y: -2 }}

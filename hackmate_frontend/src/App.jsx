@@ -16,6 +16,7 @@ import HackathonRegister from './components/Hackathons/HackathonRegister';
 import ApplicationDetail from './components/Hackathons/ApplicationDetail';
 import MyHackathons from './components/Hackathons/MyHackathons';
 import HackathonStats from './components/Hackathons/HackathonStats';
+import NotFound from './components/Layout/NotFound';
 
 
 const ProtectedRoute = ({ children }) => {
@@ -89,6 +90,8 @@ function App() {
               {/* teams */}
               <Route path="teams" element={<TeamsPage />} />
               <Route path="matching" element={<MatchingPage />} />
+
+              <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
         </Router>
