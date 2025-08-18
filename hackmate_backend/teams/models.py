@@ -12,12 +12,6 @@ class Team(models.Model):
         ('inactive', 'Inactive'),
     ]
     
-    PRIVACY_CHOICES = [
-        ('public', 'Public'),
-        ('private', 'Private'),
-        ('invite_only', 'Invite Only'),
-    ]
-    
     # Basic Information
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
@@ -48,7 +42,6 @@ class Team(models.Model):
         validators=[MinValueValidator(2), MaxValueValidator(10)]
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='looking')
-    privacy = models.CharField(max_length=20, choices=PRIVACY_CHOICES, default='public')
     
     # Skills and Requirements
     required_skills = models.JSONField(default=list, blank=True)
@@ -62,8 +55,6 @@ class Team(models.Model):
     
     # Team Collaboration
     allow_remote = models.BooleanField(default=True)
-    preferred_timezone = models.CharField(max_length=50, blank=True)
-    communication_platform = models.CharField(max_length=100, blank=True)
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)

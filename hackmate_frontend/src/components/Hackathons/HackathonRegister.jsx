@@ -677,7 +677,7 @@ const HackathonRegister = () => {
             finalLookingTeam = lookingTeam;
         }
         // For 'individual' type, finalLookingTeam stays false
-
+        console.log(roles)
         const payload = {
             hackathon: parseInt(id),
             application_type: 'individual',
@@ -1220,7 +1220,9 @@ const HackathonRegister = () => {
                                             <SmartTagSystem
                                                 label="Preferred Roles"
                                                 tags={roles}
+                                                onChange={console.log(roles)}
                                                 setTags={(newRoles) => {
+                                                    { console.log(newRoles) }
                                                     setRoles(newRoles);
                                                     if (newRoles.length > roles.length) {
                                                         showSuccess(`Added role: ${newRoles[newRoles.length - 1]}`);

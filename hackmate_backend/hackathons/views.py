@@ -370,7 +370,7 @@ def get_hackathon_participants(request):
         other_applications = HackathonApplication.objects.filter(
             hackathon=hackathon,
             status__in=['team_pending'],
-            payment_status__in=['confirmed', 'not_required']
+            payment_status__in=['completed', 'not_required']
         ).exclude(user=request.user).select_related('user')
         
         # Calculate matches using the matching algorithm

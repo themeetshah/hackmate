@@ -1,83 +1,120 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    X, Users, Trophy, Lock, Globe, MapPin, Clock,
-    MessageCircle, Code, Lightbulb, Plus, Minus, AlertCircle
+    X, Users, Trophy, MapPin, Plus, Minus, AlertCircle, ChevronRight
 } from 'lucide-react';
+import hackathonServices from '../../api/hackathonServices';
 import teamsServices from '../../api/teamsServices';
 
 const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
-    const [formData, setFormData] = useState({
+    const initialForm = {
         name: '',
         description: '',
         hackathon: '',
-        max_members: 4,
-        privacy: 'public',
+        max_members: 2,
         required_skills: [],
         looking_for_roles: [],
         project_name: '',
         project_idea: '',
-        allow_remote: true,
-        preferred_timezone: '',
-        communication_platform: ''
-    });
+        allow_remote: true
+    };
 
+    const [formData, setFormData] = useState(initialForm);
     const [availableHackathons, setAvailableHackathons] = useState([]);
+    const [hackathonMap, setHackathonMap] = useState({});
+    const [joinedHackathonIds, setJoinedHackathonIds] = useState([]);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
     const [newSkill, setNewSkill] = useState('');
     const [newRole, setNewRole] = useState('');
     const [step, setStep] = useState(1);
 
-    // Common skills and roles for suggestions
     const commonSkills = [
         'React', 'JavaScript', 'Python', 'Node.js', 'Django', 'Flask',
-        'UI/UX Design', 'Figma', 'Adobe XD', 'Photoshop',
-        'Machine Learning', 'Data Science', 'TensorFlow', 'PyTorch',
-        'Mobile Development', 'React Native', 'Flutter', 'Swift',
-        'DevOps', 'Docker', 'AWS', 'Azure', 'MongoDB', 'PostgreSQL'
+        'UI/UX Design', 'Figma', 'Machine Learning', 'Data Science'
     ];
-
     const commonRoles = [
         'Frontend Developer', 'Backend Developer', 'Full Stack Developer',
-        'UI/UX Designer', 'Product Manager', 'Data Scientist',
-        'Mobile Developer', 'DevOps Engineer', 'Marketing Specialist',
-        'Business Analyst', 'QA Engineer', 'Project Manager'
-    ];
-
-    const privacyOptions = [
-        { value: 'public', label: 'Public', description: 'Anyone can see and join your team', icon: Globe },
-        { value: 'private', label: 'Private', description: 'Only invited members can join', icon: Lock },
-        { value: 'invite_only', label: 'Invite Only', description: 'Only you can invite members', icon: Users }
+        'UI/UX Designer', 'Product Manager'
     ];
 
     useEffect(() => {
         if (isOpen) {
             fetchAvailableHackathons();
+            fetchJoinedHackathons();
+            setFormData(initialForm);
+            setStep(1);
+            setErrors({});
+            setAvailableHackathons([]);
+            setHackathonMap({});
         }
     }, [isOpen]);
 
-    const fetchAvailableHackathons = async () => {
-        const response = await teamsServices.getAvailableHackathons();
-        if (response.success) {
-            setAvailableHackathons(response.hackathons);
+    const fetchJoinedHackathons = async () => {
+        const resp = await teamsServices.getMyTeams();
+        if (resp.success) {
+            const ids = resp.teams.map(t => t.hackathon);
+            // console.log(ids)
+            setJoinedHackathonIds([...new Set(ids)]);
         }
     };
 
+    const fetchAvailableHackathons = async () => {
+        const response = await hackathonServices.getMyApplications();
+        if (response.success) {
+            const confirmed = (response.data.applications || [])
+                .filter(app =>
+                    ['completed', 'not_required'].includes(app.payment_status)
+                    && ['team_pending'].includes(app.status)
+                )
+                .map(app => app.hackathon);
+
+            const hackathonList = [];
+            const hackathonMapTmp = {};
+
+            for (let hackathon of confirmed) {
+                const { data } = await hackathonServices.getHackathonById(hackathon);
+                const obj = data ? data.hackathon : hackathon;
+                hackathonList.push(obj);
+                hackathonMapTmp[obj.id] = obj;
+            }
+            // console.log(hackathonList)
+            setAvailableHackathons(hackathonList);
+            setHackathonMap(hackathonMapTmp);
+        }
+    };
+
+    // Filter out hackathons where user already has a team
+    const selectableHackathons = availableHackathons.filter(h => !joinedHackathonIds.includes(h.id));
+    // console.log(availableHackathons)
+    // console.log(selectableHackathons)
     const handleChange = (field, value) => {
+        if (field === 'hackathon' && value) {
+            const h = hackathonMap[value];
+            setFormData(prev => ({
+                ...prev,
+                hackathon: value,
+                max_members: h ? h.min_team_size : 2
+            }));
+            return;
+        }
         setFormData(prev => ({
             ...prev,
             [field]: value
         }));
-
-        // Clear error when user starts typing
         if (errors[field]) {
-            setErrors(prev => ({
-                ...prev,
-                [field]: null
-            }));
+            setErrors(prev => ({ ...prev, [field]: null }));
         }
     };
+
+    const getTeamSizeLimit = () => {
+        const sel = hackathonMap[formData.hackathon];
+        return {
+            min: (sel && sel.min_team_size) || 2,
+            max: (sel && sel.max_team_size) || 10
+        };
+    };
+    const { min, max } = getTeamSizeLimit();
 
     const addSkill = (skill) => {
         if (skill && !formData.required_skills.includes(skill)) {
@@ -89,12 +126,10 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
         }
     };
 
-    const removeSkill = (skill) => {
-        setFormData(prev => ({
-            ...prev,
-            required_skills: prev.required_skills.filter(s => s !== skill)
-        }));
-    };
+    const removeSkill = (skill) => setFormData(prev => ({
+        ...prev,
+        required_skills: prev.required_skills.filter(s => s !== skill)
+    }));
 
     const addRole = (role) => {
         if (role && !formData.looking_for_roles.includes(role)) {
@@ -106,22 +141,24 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
         }
     };
 
-    const removeRole = (role) => {
-        setFormData(prev => ({
-            ...prev,
-            looking_for_roles: prev.looking_for_roles.filter(r => r !== role)
-        }));
-    };
+    const removeRole = (role) => setFormData(prev => ({
+        ...prev,
+        looking_for_roles: prev.looking_for_roles.filter(r => r !== role)
+    }));
 
     const validateStep = (currentStep) => {
         const newErrors = {};
-
         if (currentStep === 1) {
             if (!formData.name.trim()) newErrors.name = 'Team name is required';
             if (!formData.hackathon) newErrors.hackathon = 'Please select a hackathon';
             if (!formData.description.trim()) newErrors.description = 'Team description is required';
+            if (
+                parseInt(formData.max_members, 10) < min ||
+                parseInt(formData.max_members, 10) > max
+            ) {
+                newErrors.max_members = `Team size must be between ${min} and ${max}`;
+            }
         }
-
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -132,40 +169,33 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
         }
     };
 
-    const prevStep = () => {
-        setStep(prev => Math.max(prev - 1, 1));
+    const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
+
+    const resetAll = () => {
+        setFormData(initialForm);
+        setNewSkill('');
+        setNewRole('');
+        setAvailableHackathons([]);
+        setHackathonMap({});
+        setErrors({});
+        setStep(1);
+    };
+
+    const handleClose = () => {
+        resetAll();
+        onClose();
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
         if (!validateStep(step)) return;
-
         setLoading(true);
-
         try {
             const response = await teamsServices.createTeam(formData);
-
             if (response.success) {
+                resetAll();
                 onSuccess?.(response.team);
                 onClose();
-                // Reset form
-                setFormData({
-                    name: '',
-                    description: '',
-                    hackathon: '',
-                    max_members: 4,
-                    privacy: 'public',
-                    required_skills: [],
-                    looking_for_roles: [],
-                    project_name: '',
-                    project_idea: '',
-                    allow_remote: true,
-                    preferred_timezone: '',
-                    communication_platform: ''
-                });
-                setStep(1);
-                setErrors({});
             } else {
                 setErrors(response.errors || { general: response.message });
             }
@@ -184,173 +214,184 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-                onClick={(e) => e.target === e.currentTarget && onClose()}
+                className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+                onClick={(e) => e.target === e.currentTarget && handleClose()}
             >
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                    className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
+                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 max-w-2xl w-full max-h-[90vh] overflow-hidden"
                 >
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white/20 rounded-xl">
-                                <Users className="w-6 h-6 text-white" />
-                            </div>
+                    <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                        <div className="flex items-center justify-between">
                             <div>
-                                <h2 className="text-xl font-bold text-white">Create Team</h2>
-                                <p className="text-indigo-100 text-sm">Step {step} of 3</p>
+                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Create Team</h2>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">Step {step} of 3</p>
                             </div>
+                            <button
+                                onClick={handleClose}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            >
+                                <X className="w-5 h-5 text-gray-400" />
+                            </button>
                         </div>
-                        <button
-                            onClick={onClose}
-                            className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-                        >
-                            <X className="w-5 h-5 text-white" />
-                        </button>
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="px-6 py-2 bg-gray-50 dark:bg-gray-700">
-                        <div className="flex items-center gap-2">
+                    <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between px-3">
                             {[1, 2, 3].map((stepNumber) => (
-                                <div key={stepNumber} className="flex-1">
-                                    <div className={`h-2 rounded-full transition-colors ${stepNumber <= step
-                                            ? 'bg-gradient-to-r from-indigo-500 to-purple-500'
-                                            : 'bg-gray-200 dark:bg-gray-600'
-                                        }`} />
-                                </div>
+                                <React.Fragment key={stepNumber}>
+                                    <div className="flex flex-col items-center">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${stepNumber <= step
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
+                                            }`}>
+                                            {stepNumber}
+                                        </div>
+                                    </div>
+                                    {stepNumber < 3 && (
+                                        <div className={`flex-1 h-1 mx-4 ${stepNumber < step ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-600'
+                                            }`} />
+                                    )}
+                                </React.Fragment>
                             ))}
                         </div>
-                        <div className="flex justify-between mt-2 text-xs text-gray-600 dark:text-gray-400">
-                            <span className={step >= 1 ? 'text-indigo-600 dark:text-indigo-400' : ''}>Basic Info</span>
-                            <span className={step >= 2 ? 'text-indigo-600 dark:text-indigo-400' : ''}>Team Details</span>
-                            <span className={step >= 3 ? 'text-indigo-600 dark:text-indigo-400' : ''}>Project Info</span>
+                        <div className="flex justify-between mt-3 text-xs text-gray-500 dark:text-gray-400">
+                            <span className={`${step >= 1 ? 'text-blue-600 dark:text-blue-400 font-medium' : ''}`}>Basic Info</span>
+                            <span className={`${step >= 2 ? 'text-blue-600 dark:text-blue-400 font-medium' : ''}`}>Team Details</span>
+                            <span className={`${step >= 3 ? 'text-blue-600 dark:text-blue-400 font-medium' : ''}`}>Project Info</span>
                         </div>
                     </div>
 
-                    {/* Form Content */}
+
                     <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[60vh]">
                         {/* Step 1: Basic Information */}
                         {step === 1 && (
                             <motion.div
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                className="space-y-6"
+                                className="space-y-4"
                             >
-                                {/* Team Name */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Team Name *
                                     </label>
                                     <input
                                         type="text"
                                         value={formData.name}
                                         onChange={(e) => handleChange('name', e.target.value)}
-                                        className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${errors.name ? 'border-red-500' : 'border-gray-300'
+                                        className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 ${errors.name ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                                             }`}
                                         placeholder="Enter your team name"
                                     />
                                     {errors.name && (
-                                        <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                                             <AlertCircle className="w-4 h-4" />
                                             {errors.name}
                                         </p>
                                     )}
                                 </div>
 
-                                {/* Hackathon Selection */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Hackathon *
                                     </label>
                                     <select
                                         value={formData.hackathon}
                                         onChange={(e) => handleChange('hackathon', e.target.value)}
-                                        className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${errors.hackathon ? 'border-red-500' : 'border-gray-300'
+                                        className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${errors.hackathon ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                                             }`}
                                     >
                                         <option value="">Select a hackathon</option>
-                                        {availableHackathons.map((hackathon) => (
-                                            <option key={hackathon.id} value={hackathon.id}>
-                                                {hackathon.title} ({new Date(hackathon.start_date).toLocaleDateString()})
+                                        {selectableHackathons.map((h) => (
+                                            <option key={h.id} value={h.id}>
+                                                {h.title} ({new Date(h.start_date).toLocaleDateString()})
+                                                [min: {h.min_team_size}/max: {h.max_team_size}]
                                             </option>
                                         ))}
                                     </select>
+                                    {selectableHackathons.length === 0 && (
+                                        <p className="mt-1 text-sm text-orange-600 dark:text-orange-400">
+                                            You already have teams for all your hackathons.
+                                        </p>
+                                    )}
                                     {errors.hackathon && (
-                                        <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                                             <AlertCircle className="w-4 h-4" />
                                             {errors.hackathon}
                                         </p>
                                     )}
                                 </div>
 
-                                {/* Description */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Team Description *
                                     </label>
                                     <textarea
                                         value={formData.description}
                                         onChange={(e) => handleChange('description', e.target.value)}
-                                        rows={4}
-                                        className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${errors.description ? 'border-red-500' : 'border-gray-300'
+                                        rows={3}
+                                        className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 ${errors.description ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                                             }`}
                                         placeholder="Describe your team, goals, and what you're looking for..."
                                     />
                                     {errors.description && (
-                                        <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                                             <AlertCircle className="w-4 h-4" />
                                             {errors.description}
                                         </p>
                                     )}
                                 </div>
 
-                                {/* Team Settings */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Max Members
-                                        </label>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleChange('max_members', Math.max(2, formData.max_members - 1))}
-                                                className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-                                            >
-                                                <Minus className="w-4 h-4" />
-                                            </button>
-                                            <span className="px-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-lg font-medium">
-                                                {formData.max_members}
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleChange('max_members', Math.min(10, formData.max_members + 1))}
-                                                className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-                                            >
-                                                <Plus className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Privacy
-                                        </label>
-                                        <select
-                                            value={formData.privacy}
-                                            onChange={(e) => handleChange('privacy', e.target.value)}
-                                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Max Members
+                                    </label>
+                                    <div className="flex items-center space-x-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleChange('max_members', Math.max(min, +formData.max_members - 1))}
+                                            className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white"
                                         >
-                                            {privacyOptions.map((option) => (
-                                                <option key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            <Minus className="w-4 h-4" />
+                                        </button>
+                                        <span className="px-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-lg font-medium dark:text-white">
+                                            {formData.max_members}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleChange('max_members', Math.min(max, +formData.max_members + 1))}
+                                            className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                        </button>
                                     </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Allowed size: {min}–{max}
+                                    </div>
+                                    {errors.max_members && (
+                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                                            <AlertCircle className="w-4 h-4" />
+                                            {errors.max_members}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center space-x-3 mt-2">
+                                    <input
+                                        type="checkbox"
+                                        id="allow_remote"
+                                        checked={formData.allow_remote}
+                                        onChange={(e) => handleChange('allow_remote', e.target.checked)}
+                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                    />
+                                    <label htmlFor="allow_remote" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                        <MapPin className="w-4 h-4" />
+                                        Allow remote collaboration
+                                    </label>
                                 </div>
                             </motion.div>
                         )}
@@ -360,61 +401,55 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
                             <motion.div
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                className="space-y-6"
+                                className="space-y-4"
                             >
-                                {/* Required Skills */}
+                                {/* Skills */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Required Skills
                                     </label>
-                                    <div className="flex gap-2 mb-3">
+                                    <div className="flex gap-2 mb-2">
                                         <input
                                             type="text"
                                             value={newSkill}
                                             onChange={(e) => setNewSkill(e.target.value)}
                                             placeholder="Add a skill..."
-                                            className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                                            className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                                             onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill(newSkill))}
                                         />
                                         <button
                                             type="button"
                                             onClick={() => addSkill(newSkill)}
-                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                                         >
                                             Add
                                         </button>
                                     </div>
-
-                                    {/* Common Skills Suggestions */}
-                                    <div className="mb-3">
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Popular skills:</p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {commonSkills.filter(skill => !formData.required_skills.includes(skill)).slice(0, 8).map((skill) => (
-                                                <button
-                                                    key={skill}
-                                                    type="button"
-                                                    onClick={() => addSkill(skill)}
-                                                    className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
-                                                >
-                                                    + {skill}
-                                                </button>
-                                            ))}
-                                        </div>
+                                    <div className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                                        Popular:{" "}
+                                        {commonSkills.filter(skill => !formData.required_skills.includes(skill)).slice(0, 6).map(skill => (
+                                            <button
+                                                key={skill}
+                                                type="button"
+                                                onClick={() => addSkill(skill)}
+                                                className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full mx-1 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                            >
+                                                +{skill}
+                                            </button>
+                                        ))}
                                     </div>
-
-                                    {/* Selected Skills */}
                                     {formData.required_skills.length > 0 && (
                                         <div className="flex flex-wrap gap-2">
-                                            {formData.required_skills.map((skill) => (
+                                            {formData.required_skills.map(skill => (
                                                 <span
                                                     key={skill}
-                                                    className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300 rounded-full text-sm"
+                                                    className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-sm"
                                                 >
                                                     {skill}
                                                     <button
                                                         type="button"
                                                         onClick={() => removeSkill(skill)}
-                                                        className="hover:text-red-600"
+                                                        className="hover:text-red-600 dark:hover:text-red-400"
                                                     >
                                                         <X className="w-3 h-3" />
                                                     </button>
@@ -424,18 +459,18 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
                                     )}
                                 </div>
 
-                                {/* Looking for Roles */}
+                                {/* Roles */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Looking for Roles
                                     </label>
-                                    <div className="flex gap-2 mb-3">
+                                    <div className="flex gap-2 mb-2">
                                         <input
                                             type="text"
                                             value={newRole}
                                             onChange={(e) => setNewRole(e.target.value)}
                                             placeholder="Add a role..."
-                                            className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                                            className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                                             onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addRole(newRole))}
                                         />
                                         <button
@@ -446,28 +481,22 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
                                             Add
                                         </button>
                                     </div>
-
-                                    {/* Common Roles Suggestions */}
-                                    <div className="mb-3">
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Popular roles:</p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {commonRoles.filter(role => !formData.looking_for_roles.includes(role)).slice(0, 6).map((role) => (
-                                                <button
-                                                    key={role}
-                                                    type="button"
-                                                    onClick={() => addRole(role)}
-                                                    className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
-                                                >
-                                                    + {role}
-                                                </button>
-                                            ))}
-                                        </div>
+                                    <div className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                                        Popular:{" "}
+                                        {commonRoles.filter(role => !formData.looking_for_roles.includes(role)).slice(0, 6).map(role => (
+                                            <button
+                                                key={role}
+                                                type="button"
+                                                onClick={() => addRole(role)}
+                                                className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full mx-1 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                            >
+                                                +{role}
+                                            </button>
+                                        ))}
                                     </div>
-
-                                    {/* Selected Roles */}
                                     {formData.looking_for_roles.length > 0 && (
                                         <div className="flex flex-wrap gap-2">
-                                            {formData.looking_for_roles.map((role) => (
+                                            {formData.looking_for_roles.map(role => (
                                                 <span
                                                     key={role}
                                                     className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 rounded-full text-sm"
@@ -476,7 +505,7 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
                                                     <button
                                                         type="button"
                                                         onClick={() => removeRole(role)}
-                                                        className="hover:text-red-600"
+                                                        className="hover:text-red-600 dark:hover:text-red-400"
                                                     >
                                                         <X className="w-3 h-3" />
                                                     </button>
@@ -484,50 +513,6 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
                                             ))}
                                         </div>
                                     )}
-                                </div>
-
-                                {/* Team Preferences */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Preferred Timezone
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.preferred_timezone}
-                                            onChange={(e) => handleChange('preferred_timezone', e.target.value)}
-                                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                                            placeholder="e.g., UTC+5:30, EST, PST"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Communication Platform
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.communication_platform}
-                                            onChange={(e) => handleChange('communication_platform', e.target.value)}
-                                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                                            placeholder="e.g., Slack, Discord, Teams"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Remote Work */}
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="checkbox"
-                                        id="allow_remote"
-                                        checked={formData.allow_remote}
-                                        onChange={(e) => handleChange('allow_remote', e.target.checked)}
-                                        className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
-                                    />
-                                    <label htmlFor="allow_remote" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                        <MapPin className="w-4 h-4" />
-                                        Allow remote collaboration
-                                    </label>
                                 </div>
                             </motion.div>
                         )}
@@ -537,43 +522,37 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
                             <motion.div
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                className="space-y-6"
+                                className="space-y-4"
                             >
-                                {/* Project Name */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Project Name (Optional)
                                     </label>
                                     <input
                                         type="text"
                                         value={formData.project_name}
                                         onChange={(e) => handleChange('project_name', e.target.value)}
-                                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+                                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                                         placeholder="What will you build?"
                                     />
                                 </div>
-
-                                {/* Project Idea */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Project Idea (Optional)
                                     </label>
                                     <textarea
                                         value={formData.project_idea}
                                         onChange={(e) => handleChange('project_idea', e.target.value)}
                                         rows={4}
-                                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+                                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                                         placeholder="Describe your project idea, goals, and vision..."
                                     />
                                 </div>
-
-                                {/* Summary */}
-                                <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
+                                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                                     <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Team Summary</h3>
-                                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                                    <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
                                         <p><span className="font-medium">Name:</span> {formData.name}</p>
                                         <p><span className="font-medium">Max Members:</span> {formData.max_members}</p>
-                                        <p><span className="font-medium">Privacy:</span> {formData.privacy}</p>
                                         {formData.required_skills.length > 0 && (
                                             <p><span className="font-medium">Skills:</span> {formData.required_skills.join(', ')}</p>
                                         )}
@@ -597,33 +576,32 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
                     </form>
 
                     {/* Footer */}
-                    <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 flex items-center justify-between border-t border-gray-200 dark:border-gray-600">
-                        <div className="flex gap-2">
+                    <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                        <div>
                             {step > 1 && (
                                 <button
                                     type="button"
                                     onClick={prevStep}
-                                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600"
+                                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
                                 >
                                     Previous
                                 </button>
                             )}
                         </div>
-
-                        <div className="flex gap-2">
+                        <div className="flex space-x-3">
                             <button
                                 type="button"
-                                onClick={onClose}
-                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600"
+                                onClick={handleClose}
+                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
                             >
                                 Cancel
                             </button>
-
                             {step < 3 ? (
                                 <button
                                     type="button"
                                     onClick={nextStep}
-                                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+                                    disabled={selectableHackathons.length === 0}
+                                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Next
                                     <ChevronRight className="w-4 h-4" />
@@ -631,9 +609,9 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
                             ) : (
                                 <button
                                     type="submit"
-                                    disabled={loading}
+                                    disabled={loading || selectableHackathons.length === 0}
                                     onClick={handleSubmit}
-                                    className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                 >
                                     {loading ? (
                                         <>

@@ -7,9 +7,12 @@ import {
 import ParticipantCard from './ParticipantCard';
 import { useAuth } from '../../contexts/AuthContext';
 import hackathonServices from '../../api/hackathonServices';
+import teamsServices from '../../api/teamsServices';
+import { useToast } from '../../hooks/useToast';
 
 const MatchingPage = () => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [selectedHackathon, setSelectedHackathon] = useState('');
   const [userHackathons, setUserHackathons] = useState([]);
   const [participants, setParticipants] = useState([]);
@@ -17,18 +20,19 @@ const MatchingPage = () => {
   const [hackathonsLoading, setHackathonsLoading] = useState(true);
   const [error, setError] = useState('');
   const [view, setView] = useState('matches');
+  const [teams, setTeams] = useState([]);
 
-  // Fetch user's hackathons on component mount
   useEffect(() => {
     fetchUserHackathons();
   }, []);
 
-  // Fetch participants when hackathon selection changes
   useEffect(() => {
     if (selectedHackathon) {
       fetchParticipants();
+      fetchTeams();
     } else {
       setParticipants([]);
+      setTeams([]);
     }
   }, [selectedHackathon]);
 
@@ -36,7 +40,6 @@ const MatchingPage = () => {
     try {
       setHackathonsLoading(true);
       const response = await hackathonServices.getUserHackathons();
-
       if (response.success) {
         setUserHackathons(response.hackathons);
         // Auto-select first hackathon if available
@@ -47,10 +50,19 @@ const MatchingPage = () => {
         setError('Failed to fetch your hackathons');
       }
     } catch (error) {
-      console.error('Error fetching user hackathons:', error);
       setError('Failed to fetch your hackathons');
     } finally {
       setHackathonsLoading(false);
+    }
+  };
+
+  const fetchTeams = async () => {
+    try {
+      const response = await teamsServices.getTeams({ hackathon: selectedHackathon });
+      if (response.success) setTeams(response.teams || []);
+      else setTeams([]);
+    } catch (error) {
+      setTeams([]);
     }
   };
 
@@ -58,42 +70,95 @@ const MatchingPage = () => {
     try {
       setLoading(true);
       setError('');
-
       const response = await hackathonServices.getHackathonParticipants({
         hackathon_id: selectedHackathon
       });
-
       if (response.success) {
         setParticipants(response.participants);
       } else {
         setError(response.message || 'Failed to fetch participants');
       }
     } catch (error) {
-      console.error('Error fetching participants:', error);
       setError('Failed to fetch participants');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInvite = (participant) => {
-    // TODO: Implement invite functionality
-    console.log('Inviting participant:', participant);
+  // Helper: checks if participant is in any team for this hackathon
+  function getParticipantTeam(participantId) {
+    return teams.find(team =>
+      Array.isArray(team.members) &&
+      team.members.some(m => m.user.id === participantId && m.status === 'active')
+    );
+  }
+
+  // Helper: get user's team for this hackathon as leader or member
+  function getUserTeam() {
+    return teams.find(t =>
+      t.hackathon === selectedHackathon &&
+      t.members &&
+      t.members.some(m => m.user.id === user.id && m.status === 'active')
+    );
+  }
+
+  function getUserLeaderTeam() {
+    return teams.find(t =>
+      t.hackathon === selectedHackathon &&
+      t.team_leader?.id === user.id
+    );
+  }
+
+  // Invite: only if participant is NOT in a team
+  const handleInvite = async (participant) => {
+    // Only leader of a team can invite
+    const userTeam = getUserLeaderTeam();
+    if (!userTeam) {
+      showToast('You must be a team leader to invite.', 'error');
+      return;
+    }
+    // Already in team, do not invite
+    if (getParticipantTeam(participant.id)) {
+      showToast('User is already in a team.', 'error');
+      return;
+    }
+    // Invite participant
+    const resp = await teamsServices.inviteToTeam(
+      userTeam.id,
+      { invitee_email: participant.email }
+    );
+    if (resp.success) showToast('Invitation sent!', 'success');
+    else showToast(resp.message || 'Failed to send invite', 'error');
   };
 
-  const handleMessage = (participant) => {
-    // TODO: Implement messaging functionality
-    console.log('Messaging participant:', participant);
+  // Join team: only if participant IS in a team
+  const handleJoinTeam = async (participant) => {
+    const team = getParticipantTeam(participant.id);
+    if (!team) {
+      showToast('User is not in any team.', 'error');
+      return;
+    }
+    const resp = await teamsServices.joinTeam(team.id);
+    if (resp.success) showToast('Join request sent!', 'success');
+    else showToast(resp.message || 'Failed to send join request', 'error');
   };
 
-  const getSelectedHackathonData = () => {
-    return userHackathons.find(h => h.id === parseInt(selectedHackathon));
-  };
+  // Pass function to ParticipantCard
+  const enhancedParticipants = participants.map(p => ({
+    ...p,
+    hasTeam: !!getParticipantTeam(p.id),
+    team: getParticipantTeam(p.id)
+  }));
 
-  // Group participants by compatibility score
-  const bestMatches = participants.filter(p => p.compatibility >= 80);
-  const goodMatches = participants.filter(p => p.compatibility >= 60 && p.compatibility < 80);
-  const otherMatches = participants.filter(p => p.compatibility < 60);
+  function getSelectedHackathonData() {
+    return userHackathons.find(
+      h => String(h.id) === String(selectedHackathon)
+    );
+  }
+
+  const bestMatches = enhancedParticipants.filter(p => p.compatibility >= 80);
+  const goodMatches = enhancedParticipants.filter(p => p.compatibility >= 60 && p.compatibility < 80);
+  const otherMatches = enhancedParticipants.filter(p => p.compatibility < 60);
 
   return (
     <div className="space-y-6">
@@ -248,7 +313,7 @@ const MatchingPage = () => {
 
       {/* Participants Display */}
       <AnimatePresence>
-        {selectedHackathon && !loading && !error && participants.length > 0 && (
+        {selectedHackathon && !loading && !error && enhancedParticipants.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -256,7 +321,7 @@ const MatchingPage = () => {
             transition={{ delay: 0.2 }}
             className="space-y-6"
           >
-            {/* Best Matches View */}
+            {/* Best Matches */}
             {view === 'matches' && (
               <div className="space-y-6">
                 {bestMatches.length > 0 && (
@@ -280,8 +345,11 @@ const MatchingPage = () => {
                         >
                           <ParticipantCard
                             participant={participant}
-                            onInvite={handleInvite}
-                            onMessage={handleMessage}
+                            onInvite={participant.hasTeam
+                              ? () => handleJoinTeam(participant)
+                              : () => handleInvite(participant)}
+                            // onMessage={handleMessage}
+                            showInviteLabel={participant.hasTeam ? 'Join Team' : 'Invite'}
                           />
                         </motion.div>
                       ))}
@@ -310,8 +378,11 @@ const MatchingPage = () => {
                         >
                           <ParticipantCard
                             participant={participant}
-                            onInvite={handleInvite}
-                            onMessage={handleMessage}
+                            onInvite={participant.hasTeam
+                              ? () => handleJoinTeam(participant)
+                              : () => handleInvite(participant)}
+                            // onMessage={handleMessage}
+                            showInviteLabel={participant.hasTeam ? 'Join Team' : 'Invite'}
                           />
                         </motion.div>
                       ))}
@@ -348,8 +419,10 @@ const MatchingPage = () => {
                   </h2>
                 </div>
 
+                {console.log(participants)}
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {participants.map((participant, index) => (
+                  {enhancedParticipants.map((participant, index) =>
+                  (
                     <motion.div
                       key={participant.id}
                       initial={{ opacity: 0, y: 20 }}
@@ -358,8 +431,11 @@ const MatchingPage = () => {
                     >
                       <ParticipantCard
                         participant={participant}
-                        onInvite={handleInvite}
-                        onMessage={handleMessage}
+                        onInvite={participant.hasTeam
+                          ? () => handleJoinTeam(participant)
+                          : () => handleInvite(participant)}
+                        // onMessage={handleMessage}
+                        showInviteLabel={participant.hasTeam ? 'Join Team' : 'Invite'}
                       />
                     </motion.div>
                   ))}

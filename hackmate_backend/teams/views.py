@@ -1,3 +1,4 @@
+from datetime import timedelta
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -13,6 +14,7 @@ from .serializers import (
     TeamMessageSerializer
 )
 from hackathons.models import HackathonApplication
+from users.models import User
 
 # Team Views
 @api_view(['GET', 'POST'])
@@ -23,7 +25,7 @@ def team_list_create(request):
     POST: Create a new team
     """
     if request.method == 'GET':
-        teams = Team.objects.filter(privacy='public').select_related('hackathon', 'team_leader').prefetch_related('members')
+        teams = Team.objects.select_related('hackathon', 'team_leader').prefetch_related('members')
         
         # Optional filtering
         hackathon_id = request.query_params.get('hackathon')
@@ -53,12 +55,14 @@ def team_list_create(request):
         if serializer.is_valid():
             team = serializer.save()
             response_serializer = TeamDetailSerializer(team)
+            print(response_serializer.data)
             return Response({
                 'success': True,
                 'message': 'Team created successfully',
                 'team': response_serializer.data
             }, status=status.HTTP_201_CREATED)
         
+        print(serializer.errors)
         return Response({
             'success': False,
             'errors': serializer.errors
@@ -467,7 +471,7 @@ def team_messages(request, team_id):
         })
     
     elif request.method == 'POST':
-        serializer = TeamMessageSerializer(data=request.data, context={'request': request})
+        serializer = TeamMessageSerializer(data=request.data, context={'request': request, 'team': team})
         if serializer.is_valid():
             message = serializer.save(team=team)
             response_serializer = TeamMessageSerializer(message)
@@ -539,3 +543,75 @@ def team_message_detail(request, team_id, message_id):
             'success': True,
             'message': 'Message deleted successfully'
         }, status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def invite_to_team(request, pk):
+    """Invite a user to join a team"""
+    try:
+        team = Team.objects.get(pk=pk)
+    except Team.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Team not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # Only team leader can invite
+    if team.team_leader != request.user:
+        return Response({
+            'success': False,
+            'message': 'Only team leader can invite members'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    # Check if team is full
+    if team.is_full:
+        return Response({
+            'success': False,
+            'message': 'Team is already full'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    invitee_email = request.data.get('invitee_email')
+    message = request.data.get('message', '')
+
+    if not invitee_email:
+        return Response({
+            'success': False,
+            'message': 'Invitee email is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Get invitee user
+    try:
+        invitee = User.objects.get(email=invitee_email)
+    except User.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'User with this email does not exist'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # Check if user is already a member
+    if TeamMembership.objects.filter(team=team, user=invitee, status='active').exists():
+        return Response({
+            'success': False,
+            'message': 'User is already a member of this team'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Check if invitation already exists
+    if TeamInvitation.objects.filter(team=team, invitee=invitee, status='pending').exists():
+        return Response({
+            'success': False,
+            'message': 'Invitation already sent to this user'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Create invitation
+    invitation = TeamInvitation.objects.create(
+        team=team,
+        inviter=request.user,
+        invitee=invitee,
+        message=message,
+        expires_at=timezone.now() + timedelta(days=2)
+    )
+
+    return Response({
+        'success': True,
+        'message': 'Invitation sent successfully'
+    }, status=status.HTTP_201_CREATED)
