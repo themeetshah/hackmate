@@ -163,6 +163,47 @@ def hackathon_apply_view(request, id):
         else:
             data['status'] = 'team_pending'
             data['payment_status'] = 'not_required'
+
+        user = User.objects.get(pk=request.user.id)
+        print(f"User ID: {user.id}")
+        print(f"Before increment: {user.total_hackathons_participated}")
+        
+        # Try the update
+        user.total_hackathons_participated += 1
+        
+        print(f"In memory after increment: {user.total_hackathons_participated}")
+        
+        user.save(update_fields=['total_hackathons_participated'])
+        print(f"After save: {user.total_hackathons_participated}")
+        
+        # Refresh from database
+        hackathon.refresh_from_db()
+        print(f"After refresh_from_db: {user.total_hackathons_participated}")
+        
+        # Verify the change was persisted
+        fresh_user = User.objects.get(id=user.id)
+        print(f"Fresh from DB: {fresh_user.total_hackathons_participated}")
+        
+        
+        print(f"Hackathon ID: {hackathon.id}")
+        print(f"Before increment: {hackathon.confirmed_participants}")
+        
+        # Try the update
+        original_count = hackathon.confirmed_participants
+        hackathon.confirmed_participants += 1
+        
+        print(f"In memory after increment: {hackathon.confirmed_participants}")
+        
+        hackathon.save(update_fields=['confirmed_participants'])
+        print(f"After save: {hackathon.confirmed_participants}")
+        
+        # Refresh from database
+        hackathon.refresh_from_db()
+        print(f"After refresh_from_db: {hackathon.confirmed_participants}")
+        
+        # Verify the change was persisted
+        fresh_hackathon = Hackathon.objects.get(id=hackathon.id)
+        print(f"Fresh from DB: {fresh_hackathon.confirmed_participants}")
     else:
         data['status'] = 'payment_pending'
         data['payment_status'] = 'pending'
@@ -220,11 +261,43 @@ def update_payment_view(request, application_id):
     serializer = HackathonApplicationUpdateSerializer(application, data=data, partial=True)
     if serializer.is_valid():
         updated_application = serializer.save()
+
+        user = User.objects.get(pk=request.user.id)
+        print(f"User ID: {user.id}")
+        print(f"Before increment: {user.total_hackathons_participated}")
+        # Try the update
+        user.total_hackathons_participated += 1
+        print(f"In memory after increment: {user.total_hackathons_participated}")
+        user.save(update_fields=['total_hackathons_participated'])
+        print(f"After save: {user.total_hackathons_participated}")
+        # Refresh from database
+        user.refresh_from_db()
+        print(f"After refresh_from_db: {user.total_hackathons_participated}")        
+        # Verify the change was persisted
+        fresh_user = User.objects.get(id=user.id)
+        print(f"Fresh from DB: {fresh_user.total_hackathons_participated}")
         
         # Update participant count
         hackathon = updated_application.hackathon
+        print(f"Hackathon ID: {hackathon.id}")
+        print(f"Before increment: {hackathon.confirmed_participants}")
+        
+        # Try the update
+        original_count = hackathon.confirmed_participants
         hackathon.confirmed_participants += 1
+        
+        print(f"In memory after increment: {hackathon.confirmed_participants}")
+        
         hackathon.save(update_fields=['confirmed_participants'])
+        print(f"After save: {hackathon.confirmed_participants}")
+        
+        # Refresh from database
+        hackathon.refresh_from_db()
+        print(f"After refresh_from_db: {hackathon.confirmed_participants}")
+        
+        # Verify the change was persisted
+        fresh_hackathon = Hackathon.objects.get(id=hackathon.id)
+        print(f"Fresh from DB: {fresh_hackathon.confirmed_participants}")
         
         return Response({
             'success': True,

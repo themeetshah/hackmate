@@ -52,7 +52,7 @@ const JoinTeamsPage = ({ isOpen, onClose, user }) => {
 
     useEffect(() => {
         if (selectableHackathons.length > 0 && !selectedHackathon) {
-            setSelectedHackathon(String(selectableHackathons[0].id));
+            setSelectedHackathon((selectableHackathons[0].id));
         } else if (selectableHackathons.length === 0) {
             setSelectedHackathon('');
             setTeams([]);

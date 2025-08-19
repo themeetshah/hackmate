@@ -207,7 +207,106 @@ const teamsServices = {
                 message: error.response?.data?.message || 'Failed to delete message'
             };
         }
-    }
+    },
+
+    async getPendingRequests(teamId) {
+        try {
+            const response = await api.get(`/teams/${teamId}/pending-requests/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching pending requests:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch pending requests'
+            };
+        }
+    },
+
+    async getMyInvitations() {
+        try {
+            const response = await api.get('/teams/team-invitations/?type=received');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching my invitations:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch invitations'
+            };
+        }
+    },
+
+    async getMyRequests() {
+        try {
+            const response = await api.get('/teams/my-requests/');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching my requests:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch requests'
+            };
+        }
+    },
+
+    async inviteToTeam(teamId, inviteData) {
+        try {
+            const response = await api.post(`/teams/${teamId}/invite/`, inviteData);
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to send invitation'
+            };
+        }
+    },
+
+    async getInvitationRequests(teamId) {
+        try {
+            const response = await api.get(`/teams/${teamId}/invitation-requests/`);
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch invitation requests'
+            };
+        }
+    },
+
+    async approveInvitationRequest(invitationId, action) {
+        try {
+            const response = await api.post(`/teams/invitation-requests/${invitationId}/approve/`, { action });
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to process invitation request'
+            };
+        }
+    },
+
+    async getAllUserRequests() {
+        try {
+            const response = await api.get('/teams/all-requests/');
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch user requests'
+            };
+        }
+    },
+
+    async getAllTeamRequests(teamId) {
+        try {
+            const response = await api.get(`/teams/${teamId}/all-requests/`);
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch team requests'
+            };
+        }
+    },
 };
 
 export default teamsServices;

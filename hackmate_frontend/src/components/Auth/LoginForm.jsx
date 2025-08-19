@@ -112,8 +112,8 @@ const LoginForm = () => {
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors ${fieldErrors.email
-                      ? 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300 dark:border-gray-600'
+                    ? 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500'
+                    : 'border-gray-300 dark:border-gray-600'
                     }`}
                   placeholder="Enter your email"
                   disabled={isLoading}
@@ -140,8 +140,8 @@ const LoginForm = () => {
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
                     className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors ${fieldErrors.password
-                        ? 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500'
-                        : 'border-gray-300 dark:border-gray-600'
+                      ? 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500'
+                      : 'border-gray-300 dark:border-gray-600'
                       }`}
                     placeholder="Enter your password"
                     disabled={isLoading}
@@ -183,7 +183,7 @@ const LoginForm = () => {
                 )}
               </motion.button>
 
-              <div className="relative">
+              {/* <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-gray-300 dark:border-gray-600" />
                 </div>
@@ -199,7 +199,7 @@ const LoginForm = () => {
               >
                 <Github className="w-5 h-5 mr-2" />
                 <span className="text-gray-700 dark:text-gray-300">Continue with GitHub</span>
-              </button>
+              </button> */}
             </form>
 
             <div className="mt-8 text-center">

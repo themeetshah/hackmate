@@ -28,6 +28,7 @@ class Team(models.Model):
         on_delete=models.CASCADE, 
         related_name='led_teams'
     )
+    
     # 🔧 FIXED: Specify through_fields to resolve ambiguity
     members = models.ManyToManyField(
         User, 
@@ -148,9 +149,11 @@ class TeamMembership(models.Model):
 
 class TeamInvitation(models.Model):
     STATUS_CHOICES = [
+        ('leader_pending', 'Waiting for Leader Approval'),
         ('pending', 'Pending'),
         ('accepted', 'Accepted'),
         ('declined', 'Declined'),
+        ('rejected', 'Rejected by Leader'),
         ('expired', 'Expired'),
     ]
     

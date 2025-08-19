@@ -25,9 +25,11 @@ class TeamMembershipSerializer(serializers.ModelSerializer):
 # ADD THIS - TeamListSerializer for listing teams (simplified version)
 class TeamListSerializer(serializers.ModelSerializer):
     team_leader = UserBasicSerializer(read_only=True)
-    current_member_count = serializers.ReadOnlyField()
+    # current_member_count = serializers.ReadOnlyField()
     spots_available = serializers.ReadOnlyField()
     hackathon_title = serializers.CharField(source='hackathon.title', read_only=True)
+    members = serializers.SerializerMethodField()
+    current_member_count = serializers.ReadOnlyField()
 
     class Meta:
         model = Team
@@ -35,13 +37,28 @@ class TeamListSerializer(serializers.ModelSerializer):
             'id', 'name', 'description', 'hackathon', 'hackathon_title',
             'team_leader', 'max_members', 'current_member_count', 'spots_available',
             'status', 'required_skills', 'looking_for_roles',
-            'project_name', 'allow_remote', 'created_at'
+            'project_name', 'allow_remote', 'created_at', 'members'
+        ]
+
+    def get_members(self, obj):
+        """Return only active members"""
+        active_memberships = obj.teammembership_set.filter(status='active').select_related('user')
+        return [
+            {
+                'id': membership.user.id,
+                'name': membership.user.name,
+                'role': membership.role,
+                'skills_contribution': membership.skills_contribution
+            }
+            for membership in active_memberships
         ]
 
 # Detailed team serializer (for individual team views)
 class TeamDetailSerializer(serializers.ModelSerializer):
     team_leader = UserBasicSerializer(read_only=True)
-    members = TeamMembershipSerializer(source='teammembership_set', many=True, read_only=True)
+    # members = TeamMembershipSerializer(source='teammembership_set', many=True, read_only=True)
+    # current_member_count = serializers.ReadOnlyField()
+    members = serializers.SerializerMethodField()
     current_member_count = serializers.ReadOnlyField()
     spots_available = serializers.ReadOnlyField()
     hackathon_title = serializers.CharField(source='hackathon.title', read_only=True)
@@ -56,6 +73,23 @@ class TeamDetailSerializer(serializers.ModelSerializer):
             'status', 'required_skills', 'looking_for_roles', 'is_full',
             'project_name', 'project_idea', 'github_repo', 'demo_url',
             'allow_remote', 'created_at', 'updated_at'
+        ]
+
+    def get_members(self, obj):
+        """Return detailed info for active members only"""
+        active_memberships = obj.teammembership_set.filter(status='active').select_related('user')
+        return [
+            {
+                'id': membership.user.id,
+                'name': membership.user.name,
+                'email': membership.user.email,
+                'role': membership.role,
+                'skills_contribution': membership.skills_contribution,
+                'preferred_role_in_project': membership.preferred_role_in_project,
+                'joined_at': membership.joined_at,
+                'average_rating': membership.user.average_rating
+            }
+            for membership in active_memberships
         ]
 
 class TeamCreateSerializer(serializers.ModelSerializer):

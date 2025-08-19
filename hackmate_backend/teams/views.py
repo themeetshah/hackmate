@@ -25,7 +25,7 @@ def team_list_create(request):
     POST: Create a new team
     """
     if request.method == 'GET':
-        teams = Team.objects.select_related('hackathon', 'team_leader').prefetch_related('members')
+        teams = Team.objects.select_related('hackathon', 'team_leader').prefetch_related('teammembership_set__user')
         
         # Optional filtering
         hackathon_id = request.query_params.get('hackathon')
@@ -56,11 +56,39 @@ def team_list_create(request):
             team = serializer.save()
             response_serializer = TeamDetailSerializer(team)
             print(response_serializer.data)
+
+            # NEW LOGIC: Decline all other pending requests for same hackathon
+            user = request.user
+            hackathon = team.hackathon
+            
+            # Find and decline any pending join requests by this user for the same hackathon
+            declined_count = TeamMembership.objects.filter(
+                user=user,
+                team__hackathon=hackathon,
+                status='pending'
+            ).exclude(team=team).update(status='declined')
+            
+            # Also decline any pending invitations for this user for the same hackathon
+            from .models import TeamInvitation
+            TeamInvitation.objects.filter(
+                invitee=user,
+                team__hackathon=hackathon,
+                status='pending'
+            ).exclude(team=team).update(status='declined')
+            
+            print(f"Declined {declined_count} pending requests for user {user.id} in hackathon {hackathon.id}")
+        
+            response_serializer = TeamDetailSerializer(team)
             return Response({
                 'success': True,
                 'message': 'Team created successfully',
                 'team': response_serializer.data
             }, status=status.HTTP_201_CREATED)
+            # return Response({
+            #     'success': True,
+            #     'message': 'Team created successfully',
+            #     'team': response_serializer.data
+            # }, status=status.HTTP_201_CREATED)
         
         print(serializer.errors)
         return Response({
@@ -134,10 +162,12 @@ def my_teams(request):
     """Get user's teams (as leader or member)"""
     user = request.user
     teams = Team.objects.filter(
-        Q(team_leader=user) | Q(members=user)
-    ).select_related('hackathon', 'team_leader').prefetch_related('members').distinct()
-    
+        Q(team_leader=user) | Q(teammembership__user=user, teammembership__status='active')
+    ).select_related('hackathon', 'team_leader').prefetch_related('teammembership_set__user').distinct()
+    # for team in teams:
+        # print(team.members)
     serializer = TeamListSerializer(teams, many=True)
+    # print(serializer.data)
     return Response({
         'success': True,
         'teams': serializer.data
@@ -302,6 +332,27 @@ def manage_team_member(request, pk, member_id):
         
         # Update team status
         team.update_status()
+
+        approved_user = membership.user  # ← This is the key fix!
+        hackathon = team.hackathon
+        
+        # Find and decline any other pending join requests by the APPROVED USER for the same hackathon
+        declined_memberships = TeamMembership.objects.filter(
+            user=approved_user,  # ← Fixed: use approved_user instead of request.user
+            team__hackathon=hackathon,
+            status='pending'
+        ).exclude(team=team).update(status='declined')
+        
+        # Also decline any pending invitations for the APPROVED USER for the same hackathon
+        from .models import TeamInvitation
+        declined_invitations = TeamInvitation.objects.filter(
+            invitee=approved_user,  # ← Fixed: use approved_user instead of request.user
+            team__hackathon=hackathon,
+            status='pending'
+        ).exclude(team=team).update(status='declined')
+        
+        print(f"Approved user {approved_user.id} to team {team.id}")
+        print(f"Declined {declined_memberships} pending memberships and {declined_invitations} pending invitations for user {approved_user.id} in hackathon {hackathon.id}")
         
         return Response({
             'success': True,
@@ -569,6 +620,8 @@ def invite_to_team(request, pk):
             'success': False,
             'message': 'Team is already full'
         }, status=status.HTTP_400_BAD_REQUEST)
+    
+    print('Requested data: ',request.data)
 
     invitee_email = request.data.get('invitee_email')
     message = request.data.get('message', '')
@@ -615,3 +668,498 @@ def invite_to_team(request, pk):
         'success': True,
         'message': 'Invitation sent successfully'
     }, status=status.HTTP_201_CREATED)
+
+from django.db import transaction
+from datetime import timedelta
+from django.contrib.auth import get_user_model
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_invitation_requests(request, pk):
+    """Get ALL invitation requests for team leader"""
+    try:
+        team = Team.objects.get(pk=pk)
+    except Team.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Team not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # Only team leader can view
+    if team.team_leader != request.user:
+        return Response({
+            'success': False,
+            'message': 'Only team leader can view invitation requests'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    # ✅ Get ALL invitation requests for this team (all statuses)
+    invitation_requests = TeamInvitation.objects.filter(
+        team=team
+    ).select_related('inviter', 'invitee').order_by('-created_at')
+
+    serializer = TeamInvitationSerializer(invitation_requests, many=True)
+    return Response({
+        'success': True,
+        'invitation_requests': serializer.data
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_pending_requests(request, pk):
+    """Get ALL join requests for a team"""
+    try:
+        team = Team.objects.get(pk=pk)
+    except Team.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Team not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # Only team leader can view
+    if team.team_leader != request.user:
+        return Response({
+            'success': False,
+            'message': 'Only team leader can view requests'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    # ✅ Get ALL join requests for this team (all statuses)
+    all_requests = TeamMembership.objects.filter(
+        team=team
+    ).select_related('user').order_by('-invited_at')
+
+    requests_data = []
+    for membership in all_requests:
+        requests_data.append({
+            'id': membership.id,
+            'user': {
+                'id': membership.user.id,
+                'name': membership.user.name,
+                'email': membership.user.email,
+                'average_rating': membership.user.average_rating
+            },
+            'skills_contribution': membership.skills_contribution,
+            'preferred_role_in_project': membership.preferred_role_in_project,
+            'invitation_message': membership.invitation_message,
+            'invited_at': membership.invited_at,
+            'joined_at': membership.joined_at,
+            'left_at': membership.left_at,
+            'status': membership.status,
+            'role': membership.role
+        })
+
+    return Response({
+        'success': True,
+        'requests': requests_data
+    })
+
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def get_all_user_requests(request):
+#     """Get ALL user's requests and invitations with complete history"""
+#     user = request.user
+    
+#     # ✅ Get ALL join requests sent by user (all statuses)
+#     join_requests = TeamMembership.objects.filter(
+#         user=user,
+#         invited_by=user  # Self-requested
+#     ).select_related('team__hackathon').order_by('-invited_at')
+    
+#     # ✅ Get ALL invitations received by user (all statuses)
+#     invitations_received = TeamInvitation.objects.filter(
+#         invitee=user
+#     ).select_related('team__hackathon', 'inviter').order_by('-created_at')
+    
+#     # ✅ Get ALL invitation requests sent by user (all statuses)
+#     invitation_requests_sent = TeamInvitation.objects.filter(
+#         inviter=user
+#     ).select_related('team__hackathon', 'invitee').order_by('-created_at')
+
+#     data = {
+#         'join_requests': [],
+#         'invitations_received': [],
+#         'invitation_requests_sent': []
+#     }
+
+#     # Serialize ALL join requests with complete data
+#     for request in join_requests:
+#         data['join_requests'].append({
+#             'id': request.id,
+#             'team': {
+#                 'id': request.team.id,
+#                 'name': request.team.name,
+#                 'hackathon_title': request.team.hackathon.title
+#             },
+#             'status': request.status,
+#             'role': request.role,
+#             'skills_contribution': request.skills_contribution,
+#             'preferred_role_in_project': request.preferred_role_in_project,
+#             'invitation_message': request.invitation_message,
+#             'created_at': request.invited_at,
+#             'joined_at': request.joined_at,
+#             'left_at': request.left_at
+#         })
+
+#     # Serialize ALL invitations received with complete data
+#     for invitation in invitations_received:
+#         data['invitations_received'].append({
+#             'id': invitation.id,
+#             'team': {
+#                 'id': invitation.team.id,
+#                 'name': invitation.team.name,
+#                 'hackathon_title': invitation.team.hackathon.title
+#             },
+#             'inviter': invitation.inviter.name,
+#             'message': invitation.message,
+#             'status': invitation.status,
+#             'created_at': invitation.created_at,
+#             'responded_at': invitation.responded_at,
+#             'expires_at': invitation.expires_at
+#         })
+
+#     # Serialize ALL invitation requests sent with complete data
+#     for request in invitation_requests_sent:
+#         data['invitation_requests_sent'].append({
+#             'id': request.id,
+#             'team': {
+#                 'id': request.team.id,
+#                 'name': request.team.name,
+#                 'hackathon_title': request.team.hackathon.title
+#             },
+#             'invitee': request.invitee.name,
+#             'invitee_email': request.invitee.email,
+#             'message': request.message,
+#             'status': request.status,
+#             'created_at': request.created_at,
+#             'responded_at': request.responded_at,
+#             'expires_at': request.expires_at
+#         })
+
+#     return Response({
+#         'success': True,
+#         'data': data
+#     })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_all_user_requests(request):
+    """Get ALL user's requests and invitations with complete history"""
+    user = request.user
+    print(f"DEBUG: Getting requests for user {user.id} ({user.email})")
+    
+    # ✅ Get ALL join requests sent by user (all statuses)
+    join_requests = TeamMembership.objects.filter(
+        user=user,
+        invited_by=user  # Self-requested
+    ).select_related('team__hackathon').order_by('-invited_at')
+    print(f"DEBUG: Found {join_requests.count()} join requests")
+    
+    # ✅ Get ALL invitations received by user (all statuses)
+    invitations_received = TeamInvitation.objects.filter(
+        invitee=user
+    ).select_related('team__hackathon', 'inviter').order_by('-created_at')
+    print(f"DEBUG: Found {invitations_received.count()} invitations received")
+    
+    # ✅ Get ALL invitation requests sent by user (all statuses)
+    invitation_requests_sent = TeamInvitation.objects.filter(
+        inviter=user
+    ).select_related('team__hackathon', 'invitee').order_by('-created_at')
+    print(f"DEBUG: Found {invitation_requests_sent.count()} invitation requests sent")
+
+    # Also check for ANY team memberships for this user
+    all_memberships = TeamMembership.objects.filter(user=user)
+    print(f"DEBUG: User has {all_memberships.count()} total memberships")
+    for membership in all_memberships:
+        print(f"  - Team: {membership.team.name}, Status: {membership.status}, Invited by: {membership.invited_by}")
+
+    # Check for ANY team invitations involving this user
+    all_invitations = TeamInvitation.objects.filter(Q(invitee=user) | Q(inviter=user))
+    print(f"DEBUG: User has {all_invitations.count()} total invitations")
+    for invitation in all_invitations:
+        print(f"  - Team: {invitation.team.name}, Status: {invitation.status}, Inviter: {invitation.inviter}, Invitee: {invitation.invitee}")
+
+    data = {
+        'join_requests': [],
+        'invitations_received': [],
+        'invitation_requests_sent': []
+    }
+
+    # Serialize ALL join requests with complete data
+    for request in join_requests:
+        data['join_requests'].append({
+            'id': request.id,
+            'team': {
+                'id': request.team.id,
+                'name': request.team.name,
+                'hackathon_title': request.team.hackathon.title
+            },
+            'status': request.status,
+            'role': request.role,
+            'skills_contribution': request.skills_contribution,
+            'preferred_role_in_project': request.preferred_role_in_project,
+            'invitation_message': request.invitation_message,
+            'created_at': request.invited_at,
+            'joined_at': request.joined_at,
+            'left_at': request.left_at
+        })
+
+    # Serialize ALL invitations received with complete data
+    for invitation in invitations_received:
+        data['invitations_received'].append({
+            'id': invitation.id,
+            'team': {
+                'id': invitation.team.id,
+                'name': invitation.team.name,
+                'hackathon_title': invitation.team.hackathon.title
+            },
+            'inviter': invitation.inviter.name,
+            'message': invitation.message,
+            'status': invitation.status,
+            'created_at': invitation.created_at,
+            'responded_at': invitation.responded_at,
+            'expires_at': invitation.expires_at
+        })
+
+    # Serialize ALL invitation requests sent with complete data
+    for request in invitation_requests_sent:
+        data['invitation_requests_sent'].append({
+            'id': request.id,
+            'team': {
+                'id': request.team.id,
+                'name': request.team.name,
+                'hackathon_title': request.team.hackathon.title
+            },
+            'invitee': request.invitee.name,
+            'invitee_email': request.invitee.email,
+            'message': request.message,
+            'status': request.status,
+            'created_at': request.created_at,
+            'responded_at': request.responded_at,
+            'expires_at': request.expires_at
+        })
+
+    print(f"DEBUG: Final data counts - join_requests: {len(data['join_requests'])}, invitations_received: {len(data['invitations_received'])}, invitation_requests_sent: {len(data['invitation_requests_sent'])}")
+
+    return Response({
+        'success': True,
+        'data': data
+    })
+
+
+# ✅ NEW: Get ALL team-related requests for leaders
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_all_team_requests(request, pk):
+    """Get ALL requests and invitations for a specific team (for team leaders)"""
+    try:
+        team = Team.objects.get(pk=pk)
+    except Team.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Team not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # Only team leader can view
+    if team.team_leader != request.user:
+        return Response({
+            'success': False,
+            'message': 'Only team leader can view team requests'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    # Get ALL join requests for this team
+    join_requests = TeamMembership.objects.filter(
+        team=team
+    ).select_related('user').order_by('-invited_at')
+
+    # Get ALL invitation requests for this team
+    invitation_requests = TeamInvitation.objects.filter(
+        team=team
+    ).select_related('inviter', 'invitee').order_by('-created_at')
+
+    # Serialize join requests
+    join_requests_data = []
+    for membership in join_requests:
+        join_requests_data.append({
+            'id': membership.id,
+            'user': {
+                'id': membership.user.id,
+                'name': membership.user.name,
+                'email': membership.user.email,
+                'average_rating': membership.user.average_rating
+            },
+            'skills_contribution': membership.skills_contribution,
+            'preferred_role_in_project': membership.preferred_role_in_project,
+            'invitation_message': membership.invitation_message,
+            'invited_at': membership.invited_at,
+            'joined_at': membership.joined_at,
+            'left_at': membership.left_at,
+            'status': membership.status,
+            'role': membership.role,
+            'type': 'join_request'
+        })
+
+    # Serialize invitation requests
+    invitation_requests_data = []
+    for invitation in invitation_requests:
+        invitation_requests_data.append({
+            'id': invitation.id,
+            'inviter': {
+                'id': invitation.inviter.id,
+                'name': invitation.inviter.name,
+                'email': invitation.inviter.email
+            },
+            'invitee': {
+                'id': invitation.invitee.id,
+                'name': invitation.invitee.name,
+                'email': invitation.invitee.email
+            },
+            'message': invitation.message,
+            'status': invitation.status,
+            'created_at': invitation.created_at,
+            'responded_at': invitation.responded_at,
+            'expires_at': invitation.expires_at,
+            'type': 'invitation_request'
+        })
+
+    return Response({
+        'success': True,
+        'data': {
+            'join_requests': join_requests_data,
+            'invitation_requests': invitation_requests_data
+        }
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_my_requests(request):
+    """Get user's join requests"""
+    user = request.user
+    
+    # Get user's pending join requests
+    my_requests = TeamMembership.objects.filter(
+        user=user, 
+        status='pending',
+        invited_by=user  # Self-requested
+    ).select_related('team')
+
+    requests_data = []
+    for membership in my_requests:
+        requests_data.append({
+            'id': membership.id,
+            'team': {
+                'id': membership.team.id,
+                'name': membership.team.name,
+                'hackathon_title': membership.team.hackathon.title
+            },
+            'invited_at': membership.invited_at,
+            'status': membership.status
+        })
+
+    return Response({
+        'success': True,
+        'requests': requests_data
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def invite_to_team(request, pk):
+    """Create invitation request - anyone can invite, but leader must approve"""
+    try:
+        team = Team.objects.get(pk=pk)
+    except Team.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Team not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    invitee_email = request.data.get('invitee_email')
+    message = request.data.get('message', '')
+
+    if not invitee_email:
+        return Response({
+            'success': False,
+            'message': 'Invitee email is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Get invitee user
+    try:
+        invitee = get_user_model().objects.get(email=invitee_email)
+    except get_user_model().DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'User with this email does not exist'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # Check if user is already a member
+    if TeamMembership.objects.filter(team=team, user=invitee, status='active').exists():
+        return Response({
+            'success': False,
+            'message': 'User is already a member of this team'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Check if invitation already exists
+    if TeamInvitation.objects.filter(
+        team=team, 
+        invitee=invitee, 
+        status__in=['pending', 'leader_pending']
+    ).exists():
+        return Response({
+            'success': False,
+            'message': 'Invitation already sent to this user'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Create invitation with leader_pending status
+    invitation = TeamInvitation.objects.create(
+        team=team,
+        inviter=request.user,
+        invitee=invitee,
+        message=message,
+        status='leader_pending',  # Requires leader approval first
+        expires_at=timezone.now() + timedelta(days=7)
+    )
+
+    return Response({
+        'success': True,
+        'message': 'Invitation request sent to team leader for approval'
+    }, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def approve_invitation_request(request, pk):
+    """Team leader approves/rejects invitation requests"""
+    try:
+        invitation = TeamInvitation.objects.get(pk=pk)
+    except TeamInvitation.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Invitation not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # Only team leader can approve
+    if invitation.team.team_leader != request.user:
+        return Response({
+            'success': False,
+            'message': 'Only team leader can approve invitations'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    action = request.data.get('action')  # 'approve' or 'reject'
+
+    if action == 'approve':
+        invitation.status = 'pending'  # Now sends to invitee
+        invitation.save()
+        return Response({
+            'success': True,
+            'message': 'Invitation approved and sent to user'
+        })
+    elif action == 'reject':
+        invitation.status = 'rejected'
+        invitation.save()
+        return Response({
+            'success': True,
+            'message': 'Invitation request rejected'
+        })
+    else:
+        return Response({
+            'success': False,
+            'message': 'Invalid action'
+        }, status=status.HTTP_400_BAD_REQUEST)
+

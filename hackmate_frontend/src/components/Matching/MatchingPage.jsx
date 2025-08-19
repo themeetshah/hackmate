@@ -87,9 +87,10 @@ const MatchingPage = () => {
 
   // Helper: checks if participant is in any team for this hackathon
   function getParticipantTeam(participantId) {
+    console.log(teams)
     return teams.find(team =>
       Array.isArray(team.members) &&
-      team.members.some(m => m.user.id === participantId && m.status === 'active')
+      team.members.some(m => m.id === participantId && m.status === 'active')
     );
   }
 

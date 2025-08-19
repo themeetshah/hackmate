@@ -57,6 +57,7 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
             // console.log(ids)
             setJoinedHackathonIds([...new Set(ids)]);
         }
+        console.log(resp)
     };
 
     const fetchAvailableHackathons = async () => {
@@ -267,7 +268,7 @@ const CreateTeamForm = ({ isOpen, onClose, onSuccess }) => {
                     </div>
 
 
-                    <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[60vh]">
+                    <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[55vh]">
                         {/* Step 1: Basic Information */}
                         {step === 1 && (
                             <motion.div
