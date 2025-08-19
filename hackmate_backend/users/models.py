@@ -39,9 +39,9 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='participant')
     
     # Hackathon Statistics (Updated field names for clarity)
-    total_hackathons_participated = models.PositiveIntegerField(default=0)  # Renamed from total_hackathons
-    total_hackathons_organized = models.PositiveIntegerField(default=0)     # New field for organizers
-    hackathons_won = models.PositiveIntegerField(default=0)
+    total_hackathons_participated = models.IntegerField(default=0)  # Renamed from total_hackathons
+    total_hackathons_organized = models.IntegerField(default=0)     # New field for organizers
+    hackathons_won = models.IntegerField(default=0)
     average_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
     
     # Profile Settings
