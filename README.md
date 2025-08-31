@@ -7,7 +7,7 @@ It features score-based algorithm, intuitive team management, direct chat messag
 
 ## 🎥 Demo
 
-Video Preview: [▶️ Watch Demo](https://linkedin.com/example-demo-link)
+Video Preview: [▶️ Watch Demo](https://www.linkedin.com/posts/themeetshahh_hackmate-hackathon-teambuilding-activity-7367905331416338432-DhgV)
 
 ## 🚀 Features
 
